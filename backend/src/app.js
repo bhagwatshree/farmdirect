@@ -21,6 +21,10 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 app.use(cors());
+
+// Webhook MUST be registered before express.json() — needs raw body for signature verification
+app.use('/api/webhook', require('./routes/webhook'));
+
 app.use(express.json());
 
 app.use('/api/auth', require('./routes/auth'));

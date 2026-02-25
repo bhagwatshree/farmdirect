@@ -24,28 +24,34 @@ export const BROWSE_CATEGORIES = ['All', ...FRUIT_CATEGORIES];
 
 export const UNITS = ['kg', 'piece', 'dozen', 'box', 'bunch'];
 
-export const ORDER_STATUSES = ['payment_pending', 'payment_complete', 'pending', 'confirmed', 'accepted', 'rejected', 'shipped', 'delivered'];
+export const ORDER_STATUSES = ['payment_pending', 'payment_authorized', 'payment_captured', 'payment_complete', 'payment_failed', 'pending', 'confirmed', 'accepted', 'rejected', 'shipped', 'delivered'];
 
 export const STATUS_COLORS = {
-  payment_pending: 'default',
-  payment_complete: 'success',
-  pending: 'warning',
-  confirmed: 'info',
-  accepted: 'info',
-  rejected: 'error',
-  shipped: 'primary',
-  delivered: 'success',
+  payment_pending:    'default',
+  payment_authorized: 'warning',
+  payment_captured:   'info',
+  payment_complete:   'success',
+  payment_failed:     'error',
+  pending:            'warning',
+  confirmed:          'info',
+  accepted:           'info',
+  rejected:           'error',
+  shipped:            'primary',
+  delivered:          'success',
 };
 
 export const STATUS_LABELS = {
-  payment_pending: 'Awaiting Payment',
-  payment_complete: 'Payment Complete',
-  pending: 'Pending',
-  confirmed: 'Confirmed',
-  accepted: 'Accepted',
-  rejected: 'Rejected',
-  shipped: 'Shipped',
-  delivered: 'Delivered',
+  payment_pending:    'Awaiting Payment',
+  payment_authorized: 'Payment Authorised',
+  payment_captured:   'Payment Captured',
+  payment_complete:   'Payment Complete',
+  payment_failed:     'Payment Failed',
+  pending:            'Pending',
+  confirmed:          'Confirmed',
+  accepted:           'Accepted',
+  rejected:           'Rejected',
+  shipped:            'Shipped',
+  delivered:          'Delivered',
 };
 
 // Helpers
