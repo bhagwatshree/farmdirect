@@ -1,38 +1,43 @@
 const express = require('express');
+const crypto = require('crypto');
+const Razorpay = require('razorpay');
 const { v4: uuidv4 } = require('uuid');
 const Order = require('../models/Order');
 const Fruit = require('../models/Fruit');
 const Voucher = require('../models/Voucher');
 const authenticate = require('../middleware/auth');
-const { notifyOrderCreated, notifyStatusChanged } = require('../utils/notifications');
+const { notifyOrderCreated } = require('../utils/notifications');
 
 const router = express.Router();
 
-// Helper: validate a voucher and calculate discount
+const razorpay = new Razorpay({
+  key_id:     process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
+// Helper: validate voucher (mirrors orders.js)
 async function validateVoucher(code, subtotal) {
   if (!code) return { discountAmount: 0 };
-
   const voucher = await Voucher.findOne({ code: code.toUpperCase() });
   if (!voucher) return { error: `Voucher code '${code}' not found` };
   if (!voucher.isActive) return { error: 'Voucher is no longer active' };
   if (voucher.expiresAt && new Date(voucher.expiresAt) < new Date()) return { error: 'Voucher has expired' };
   if (voucher.maxUses > 0 && voucher.usedCount >= voucher.maxUses) return { error: 'Voucher has reached its usage limit' };
   if (voucher.minOrderAmount > 0 && subtotal < voucher.minOrderAmount) {
-    return { error: `Minimum order amount of $${voucher.minOrderAmount.toFixed(2)} required` };
+    return { error: `Minimum order amount of ₹${voucher.minOrderAmount.toFixed(2)} required` };
   }
-
   let discountAmount;
   if (voucher.type === 'percentage') {
     discountAmount = parseFloat(((subtotal * voucher.value) / 100).toFixed(2));
   } else {
     discountAmount = parseFloat(Math.min(voucher.value, subtotal).toFixed(2));
   }
-
   return { discountAmount, voucher };
 }
 
-// Customer: place order
-router.post('/', authenticate, async (req, res) => {
+// POST /api/payment/create-order
+// Creates DB order (payment_pending) + Razorpay order, returns checkout details
+router.post('/create-order', authenticate, async (req, res) => {
   try {
     if (req.user.role !== 'customer') {
       return res.status(403).json({ message: 'Customers only' });
@@ -43,6 +48,7 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(400).json({ message: 'No items in order' });
     }
 
+    // Build order items and calculate totals
     const orderItems = [];
     let subtotal = 0;
     let transportCost = 0;
@@ -51,12 +57,15 @@ router.post('/', authenticate, async (req, res) => {
       const fruit = await Fruit.findById(item.fruitId);
       if (!fruit) return res.status(400).json({ message: `Fruit not found: ${item.fruitId}` });
       if (fruit.quantity < item.quantity) {
-        return res.status(400).json({ message: `Only ${fruit.quantity} ${fruit.unit} available for ${fruit.name}` });
+        return res.status(400).json({
+          message: `Only ${fruit.quantity} ${fruit.unit} available for ${fruit.name}`,
+        });
       }
 
       const itemSubtotal = parseFloat((fruit.price * item.quantity).toFixed(2));
       const itemTransport = parseFloat(((fruit.transportCostPerUnit || 0) * item.quantity).toFixed(2));
 
+      // Reserve stock immediately to prevent overselling
       await Fruit.findByIdAndUpdate(item.fruitId, { $inc: { quantity: -item.quantity } });
 
       orderItems.push({
@@ -81,14 +90,27 @@ router.post('/', authenticate, async (req, res) => {
 
     const voucherResult = await validateVoucher(voucherCode, subtotal);
     if (voucherResult.error) {
+      // Restore stock if voucher fails
+      for (const item of items) {
+        await Fruit.findByIdAndUpdate(item.fruitId, { $inc: { quantity: item.quantity } });
+      }
       return res.status(400).json({ message: voucherResult.error });
     }
 
     const { discountAmount = 0, voucher } = voucherResult;
     const total = parseFloat(Math.max(0, subtotal + transportCost - discountAmount).toFixed(2));
 
+    // Create Razorpay order (amount in paise)
+    const rzpOrder = await razorpay.orders.create({
+      amount: Math.round(total * 100), // paise
+      currency: 'INR',
+      receipt: uuidv4(),
+    });
+
+    // Save DB order with payment_pending status
+    const orderId = uuidv4();
     const order = new Order({
-      _id: uuidv4(),
+      _id: orderId,
       customerId: req.user.id,
       customerName: req.user.name,
       billingAddress: billingAddress || {},
@@ -99,6 +121,8 @@ router.post('/', authenticate, async (req, res) => {
       voucherCode: voucherCode ? voucherCode.toUpperCase() : null,
       discountAmount,
       total,
+      status: 'payment_pending',
+      razorpayOrderId: rzpOrder.id,
     });
 
     await order.save();
@@ -107,56 +131,56 @@ router.post('/', authenticate, async (req, res) => {
       await Voucher.findByIdAndUpdate(voucher._id, { $inc: { usedCount: 1 } });
     }
 
-    notifyOrderCreated(order).catch(err => console.error('[Notify] orderCreated:', err.message));
-
-    res.status(201).json(order.toJSON());
+    res.status(201).json({
+      orderId: order._id,
+      razorpayOrderId: rzpOrder.id,
+      amount: rzpOrder.amount,
+      currency: rzpOrder.currency,
+      key: process.env.RAZORPAY_KEY_ID,
+      customerName: req.user.name,
+      customerEmail: req.user.email,
+    });
   } catch (error) {
-    console.error('Create order error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Payment create-order error:', error);
+    res.status(500).json({ message: 'Could not initiate payment. Please try again.' });
   }
 });
 
-// Get orders (filtered by role)
-router.get('/', authenticate, async (req, res) => {
+// POST /api/payment/verify
+// Verifies Razorpay signature, marks order as payment_complete
+router.post('/verify', authenticate, async (req, res) => {
   try {
-    let orders;
-    if (req.user.role === 'customer') {
-      orders = await Order.find({ customerId: req.user.id }).sort({ createdAt: -1 }).lean();
-    } else if (req.user.role === 'farmer') {
-      orders = await Order.find({ 'items.farmerId': req.user.id }).sort({ createdAt: -1 }).lean();
-    } else {
-      orders = [];
-    }
-    res.json(orders);
-  } catch (error) {
-    console.error('Get orders error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+    const { orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
 
-// Farmer: update order status
-router.put('/:id/status', authenticate, async (req, res) => {
-  try {
-    if (req.user.role !== 'farmer') return res.status(403).json({ message: 'Farmers only' });
+    // Verify HMAC signature
+    const body = `${razorpayOrderId}|${razorpayPaymentId}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest('hex');
 
-    const validStatuses = ['confirmed', 'accepted', 'rejected', 'shipped', 'delivered'];
-    if (!validStatuses.includes(req.body.status)) {
-      return res.status(400).json({ message: 'Invalid status' });
+    if (expectedSignature !== razorpaySignature) {
+      return res.status(400).json({ message: 'Payment verification failed. Invalid signature.' });
     }
 
     const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      { status: req.body.status },
+      orderId,
+      {
+        status: 'payment_complete',
+        razorpayPaymentId,
+        paidAt: new Date(),
+      },
       { new: true }
     );
+
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    notifyStatusChanged(order, req.user).catch(err => console.error('[Notify] statusChanged:', err.message));
+    notifyOrderCreated(order).catch(err => console.error('[Notify] orderCreated:', err.message));
 
-    res.json(order.toJSON());
+    res.json({ message: 'Payment verified successfully', order: order.toJSON() });
   } catch (error) {
-    console.error('Update order status error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Payment verify error:', error);
+    res.status(500).json({ message: 'Payment verification failed. Please contact support.' });
   }
 });
 

@@ -6,7 +6,7 @@ import { Receipt } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { STATUS_COLORS, getCategoryEmoji, formatOrderId, formatINR } from '../utils/constants';
+import { STATUS_COLORS, STATUS_LABELS, getCategoryEmoji, formatOrderId, formatINR } from '../utils/constants';
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -50,7 +50,11 @@ export default function OrdersPage() {
                     {new Date(order.createdAt).toLocaleString()}
                   </Typography>
                 </Box>
-                <Chip label={order.status.toUpperCase()} color={STATUS_COLORS[order.status]} size="small" />
+                <Chip
+                  label={STATUS_LABELS[order.status] || order.status.toUpperCase()}
+                  color={STATUS_COLORS[order.status] || 'default'}
+                  size="small"
+                />
               </Box>
 
               {user?.role === 'farmer' && (

@@ -29,6 +29,7 @@ app.use('/api/orders', require('./routes/orders'));
 app.use('/api/vouchers', require('./routes/vouchers'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/chat', require('./routes/chat'));
+app.use('/api/payment', require('./routes/payment'));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'Backend is running!' });

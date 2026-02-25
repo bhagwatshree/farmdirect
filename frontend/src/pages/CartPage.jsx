@@ -70,25 +70,80 @@ export default function CartPage() {
     }
   };
 
+  const loadRazorpayScript = () =>
+    new Promise((resolve) => {
+      if (window.Razorpay) { resolve(true); return; }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+
   const handleCheckout = async () => {
     setLoading(true);
     try {
+      const loaded = await loadRazorpayScript();
+      if (!loaded) {
+        setSnack({ open: true, msg: 'Payment gateway failed to load. Check your connection.', severity: 'error' });
+        return;
+      }
+
       const orderItems = items.map(i => ({ fruitId: i.id, quantity: i.qty }));
       const deliveryAddr = sameAsBlling ? billingAddress : deliveryAddress;
-      await api.post('/orders', {
+
+      // Step 1: Create order on backend → get Razorpay order details
+      const { data } = await api.post('/payment/create-order', {
         items: orderItems,
         billingAddress,
         deliveryAddress: deliveryAddr,
         voucherCode: voucher ? voucher.code : undefined,
       });
-      clearCart();
-      setSnack({ open: true, msg: t('cart.order_success'), severity: 'success' });
-      setTimeout(() => navigate('/orders'), 1500);
+
+      // Step 2: Open Razorpay checkout
+      const options = {
+        key: data.key,
+        amount: data.amount,
+        currency: data.currency,
+        name: 'FarmDirect',
+        description: 'Fresh produce from local farmers',
+        order_id: data.razorpayOrderId,
+        prefill: {
+          name: data.customerName,
+          email: data.customerEmail,
+        },
+        theme: { color: '#2e7d32' },
+        handler: async (response) => {
+          try {
+            // Step 3: Verify payment on backend
+            await api.post('/payment/verify', {
+              orderId: data.orderId,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+            clearCart();
+            setSnack({ open: true, msg: t('cart.order_success'), severity: 'success' });
+            setTimeout(() => navigate('/orders'), 1500);
+          } catch {
+            setSnack({ open: true, msg: t('cart.order_failed'), severity: 'error' });
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setLoading(false);
+            setSnack({ open: true, msg: 'Payment cancelled. Your order is held for 30 minutes.', severity: 'warning' });
+          },
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
     } catch (err) {
       setSnack({ open: true, msg: err.response?.data?.message || t('cart.order_failed'), severity: 'error' });
-    } finally {
       setLoading(false);
     }
+    // Don't call setLoading(false) here — it stays true until payment modal closes
   };
 
   if (items.length === 0) {
