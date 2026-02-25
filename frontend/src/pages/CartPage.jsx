@@ -108,6 +108,9 @@ export default function CartPage() {
         name: 'FarmDirect',
         description: 'Fresh produce from local farmers',
         order_id: data.razorpayOrderId,
+        // callback_url handles redirect-based payment methods (UPI, some netbanking)
+        // where Razorpay redirects the browser instead of calling the JS handler
+        callback_url: `${window.location.origin}/api/payment/callback`,
         prefill: {
           name: data.customerName,
           email: data.customerEmail,

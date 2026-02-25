@@ -184,4 +184,44 @@ router.post('/verify', authenticate, async (req, res) => {
   }
 });
 
+// POST /api/payment/callback
+// Handles Razorpay browser redirect for payment methods that can't use the JS handler
+// (some UPI flows, netbanking). Razorpay POSTs form data here after payment.
+router.post('/callback', express.urlencoded({ extended: false }), async (req, res) => {
+  try {
+    const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
+
+    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+      return res.redirect('/?payment=failed');
+    }
+
+    // Verify HMAC signature
+    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest('hex');
+
+    if (expectedSignature !== razorpay_signature) {
+      return res.redirect('/?payment=failed');
+    }
+
+    // Find order by Razorpay order ID (no JWT here — redirect flow)
+    const order = await Order.findOneAndUpdate(
+      { razorpayOrderId: razorpay_order_id },
+      { status: 'payment_complete', razorpayPaymentId: razorpay_payment_id, paidAt: new Date() },
+      { new: true }
+    );
+
+    if (order) {
+      notifyOrderCreated(order).catch(err => console.error('[Notify] callback orderCreated:', err.message));
+    }
+
+    res.redirect('/orders?payment=success');
+  } catch (error) {
+    console.error('Payment callback error:', error);
+    res.redirect('/?payment=failed');
+  }
+});
+
 module.exports = router;
