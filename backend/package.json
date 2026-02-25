@@ -1,0 +1,68 @@
+{
+  "name": "react-node-backend",
+  "version": "1.0.0",
+  "description": "Node.js backend for React application",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "globalSetup": "./src/__tests__/globalSetup.js",
+    "globalTeardown": "./src/__tests__/globalTeardown.js",
+    "testTimeout": 60000,
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "src/__tests__/globalSetup\\.js$",
+      "src/__tests__/globalTeardown\\.js$",
+      "src/__tests__/helpers/"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/index.js",
+      "!src/__tests__/**",
+      "!src/data/store.js",
+      "!src/config/database.js",
+      "!src/utils/seed.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 80,
+        "functions": 80,
+        "lines": 85,
+        "statements": 85
+      }
+    }
+  },
+  "keywords": [
+    "express",
+    "api"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.23.0",
+    "morgan": "^1.10.0",
+    "nodemailer": "^8.0.1",
+    "openai": "^6.25.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "mongodb-memory-server": "^11.0.1",
+    "nodemon": "^2.0.20",
+    "supertest": "^6.3.4"
+  }
+}
