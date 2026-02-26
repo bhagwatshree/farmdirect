@@ -163,12 +163,23 @@ router.post('/verify', authenticate, async (req, res) => {
       return res.status(400).json({ message: 'Payment verification failed. Invalid signature.' });
     }
 
+    const existing = await Order.findById(orderId);
+    if (!existing) return res.status(404).json({ message: 'Order not found' });
+
     const order = await Order.findByIdAndUpdate(
       orderId,
       {
         status: 'payment_complete',
         razorpayPaymentId,
         paidAt: new Date(),
+        $push: {
+          transactions: {
+            type: 'payment',
+            amount: existing.total,
+            razorpayId: razorpayPaymentId,
+            status: 'captured',
+          },
+        },
       },
       { new: true }
     );

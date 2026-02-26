@@ -1,10 +1,16 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
+const Razorpay = require('razorpay');
 const Order = require('../models/Order');
 const Fruit = require('../models/Fruit');
 const Voucher = require('../models/Voucher');
 const authenticate = require('../middleware/auth');
 const { notifyOrderCreated, notifyStatusChanged } = require('../utils/notifications');
+
+const razorpay = new Razorpay({
+  key_id:     process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 const router = express.Router();
 
@@ -134,7 +140,7 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// Farmer: update order status
+// Farmer: update order status (optionally set estimatedDelivery)
 router.put('/:id/status', authenticate, async (req, res) => {
   try {
     if (req.user.role !== 'farmer') return res.status(403).json({ message: 'Farmers only' });
@@ -144,11 +150,12 @@ router.put('/:id/status', authenticate, async (req, res) => {
       return res.status(400).json({ message: 'Invalid status' });
     }
 
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      { status: req.body.status },
-      { new: true }
-    );
+    const update = { status: req.body.status };
+    if (req.body.estimatedDelivery) {
+      update.estimatedDelivery = new Date(req.body.estimatedDelivery);
+    }
+
+    const order = await Order.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
     notifyStatusChanged(order, req.user).catch(err => console.error('[Notify] statusChanged:', err.message));
@@ -156,6 +163,60 @@ router.put('/:id/status', authenticate, async (req, res) => {
     res.json(order.toJSON());
   } catch (error) {
     console.error('Update order status error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Customer: cancel order (with Razorpay refund if already paid)
+router.put('/:id/cancel', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'customer') return res.status(403).json({ message: 'Customers only' });
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    if (order.customerId !== req.user.id) return res.status(403).json({ message: 'Forbidden' });
+
+    const cancellableStatuses = ['payment_pending', 'payment_complete', 'pending', 'confirmed', 'accepted'];
+    if (!cancellableStatuses.includes(order.status)) {
+      return res.status(400).json({ message: `Cannot cancel an order with status '${order.status}'` });
+    }
+
+    // Restore stock
+    for (const item of order.items) {
+      await Fruit.findByIdAndUpdate(item.fruitId, { $inc: { quantity: item.quantity } });
+    }
+
+    const updateFields = { status: 'cancelled', cancelledAt: new Date() };
+    let refundId = null;
+
+    // Initiate Razorpay refund if payment was captured
+    const refundableStatuses = ['payment_complete', 'pending', 'confirmed', 'accepted'];
+    if (refundableStatuses.includes(order.status) && order.razorpayPaymentId) {
+      try {
+        const refund = await razorpay.payments.refund(order.razorpayPaymentId, {
+          amount: Math.round(order.total * 100),
+          notes: { reason: 'Customer cancellation' },
+        });
+        refundId = refund.id;
+        updateFields.$push = {
+          transactions: {
+            type: 'refund',
+            amount: order.total,
+            razorpayId: refund.id,
+            status: refund.status || 'initiated',
+            note: 'Customer cancellation refund',
+          },
+        };
+      } catch (refundErr) {
+        console.error('[Refund] Razorpay refund error:', refundErr.message);
+        return res.status(502).json({ message: 'Refund initiation failed. Please contact support.' });
+      }
+    }
+
+    const updated = await Order.findByIdAndUpdate(req.params.id, updateFields, { new: true });
+    res.json({ message: 'Order cancelled', refundId, order: updated.toJSON() });
+  } catch (error) {
+    console.error('Cancel order error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

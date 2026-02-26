@@ -24,7 +24,7 @@ export const BROWSE_CATEGORIES = ['All', ...FRUIT_CATEGORIES];
 
 export const UNITS = ['kg', 'piece', 'dozen', 'box', 'bunch'];
 
-export const ORDER_STATUSES = ['payment_pending', 'payment_authorized', 'payment_captured', 'payment_complete', 'payment_failed', 'pending', 'confirmed', 'accepted', 'rejected', 'shipped', 'delivered'];
+export const ORDER_STATUSES = ['payment_pending', 'payment_authorized', 'payment_captured', 'payment_complete', 'payment_failed', 'pending', 'confirmed', 'accepted', 'rejected', 'shipped', 'delivered', 'cancelled'];
 
 export const STATUS_COLORS = {
   payment_pending:    'default',
@@ -38,6 +38,7 @@ export const STATUS_COLORS = {
   rejected:           'error',
   shipped:            'primary',
   delivered:          'success',
+  cancelled:          'error',
 };
 
 export const STATUS_LABELS = {
@@ -52,6 +53,7 @@ export const STATUS_LABELS = {
   rejected:           'Rejected',
   shipped:            'Shipped',
   delivered:          'Delivered',
+  cancelled:          'Cancelled',
 };
 
 // Helpers
