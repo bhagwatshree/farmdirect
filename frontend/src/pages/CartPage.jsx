@@ -108,9 +108,6 @@ export default function CartPage() {
         name: 'FarmDirect',
         description: 'Fresh produce from local farmers',
         order_id: data.razorpayOrderId,
-        // callback_url handles redirect-based payment methods (UPI, some netbanking)
-        // where Razorpay redirects the browser instead of calling the JS handler
-        callback_url: `${window.location.origin}/api/payment/callback`,
         prefill: {
           name: data.customerName,
           email: data.customerEmail,
@@ -118,7 +115,7 @@ export default function CartPage() {
         theme: { color: '#2e7d32' },
         handler: async (response) => {
           try {
-            // Step 3: Verify payment on backend
+            // Step 3: Verify payment signature on backend
             await api.post('/payment/verify', {
               orderId: data.orderId,
               razorpayOrderId: response.razorpay_order_id,
@@ -128,8 +125,9 @@ export default function CartPage() {
             clearCart();
             setSnack({ open: true, msg: t('cart.order_success'), severity: 'success' });
             setTimeout(() => navigate('/orders'), 1500);
-          } catch {
-            setSnack({ open: true, msg: t('cart.order_failed'), severity: 'error' });
+          } catch (err) {
+            console.error('[Payment] Verify failed:', err.response?.data || err.message);
+            setSnack({ open: true, msg: err.response?.data?.message || t('cart.order_failed'), severity: 'error' });
           }
         },
         modal: {
