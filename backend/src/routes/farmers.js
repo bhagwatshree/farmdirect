@@ -6,13 +6,13 @@ const authenticate = require('../middleware/auth');
 const router = express.Router();
 
 // Public fields exposed on a farmer profile (never expose password / tokens)
-const PUBLIC_FIELDS = 'name location phone farmName farmTagline farmStory farmImages farmingPractices certifications establishedYear farmSizeAcres createdAt';
+const PUBLIC_FIELDS = 'role name location phone farmName farmTagline farmStory farmImages farmingPractices certifications establishedYear farmSizeAcres createdAt';
 
 // GET /api/farmers/:id  — public farmer profile
 router.get('/:id', async (req, res) => {
   try {
     const farmer = await User.findById(req.params.id).select(PUBLIC_FIELDS).lean();
-    if (!farmer || farmer.role === 'customer') {
+    if (!farmer || farmer.role !== 'farmer') {
       return res.status(404).json({ message: 'Farmer not found' });
     }
 
