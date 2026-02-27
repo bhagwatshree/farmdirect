@@ -18,6 +18,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import ChatBot from './components/ChatBot';
 import CartDrawer from './components/CartDrawer';
+import CartBottomBar from './components/CartBottomBar';
 
 const theme = createTheme({
   palette: {
@@ -52,7 +53,8 @@ export default function App() {
           <BrowserRouter>
             <Navbar />
             <CartDrawer />
-            <Box sx={{ overflowX: 'hidden', width: '100%' }}>
+            {/* Extra bottom padding on mobile so content isn't hidden by CartBottomBar */}
+            <Box sx={{ overflowX: 'hidden', width: '100%', pb: { xs: 9, md: 0 } }}>
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/listings" element={<HomePage />} />
@@ -75,6 +77,7 @@ export default function App() {
               } />
             </Routes>
             </Box>
+            <CartBottomBar />
             <ChatBot />
           </BrowserRouter>
         </CartProvider>
