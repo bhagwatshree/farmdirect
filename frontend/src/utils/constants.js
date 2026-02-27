@@ -56,7 +56,49 @@ export const STATUS_LABELS = {
   cancelled:          'Cancelled',
 };
 
-// Helpers
+// ─── Transport / Shipping configuration ──────────────────────────────────────
+
+// Approximate weight (kg) per 1 unit of each unit type — adjust as needed
+export const UNIT_WEIGHT_KG = {
+  kg:    1,
+  piece: 0.3,
+  dozen: 1.2,
+  box:   5,
+  bunch: 0.5,
+};
+
+// Maximum total cart weight allowed (kg)
+export const MAX_ORDER_KG = 100;
+
+// Tiered flat shipping fee — edit cost values here to reconfigure
+export const TRANSPORT_TIERS = [
+  { label: 'Up to 10 kg',  maxKg: 10,  cost: 30  },
+  { label: '10 – 30 kg',   maxKg: 30,  cost: 60  },
+  { label: '30 – 50 kg',   maxKg: 50,  cost: 100 },
+  { label: '50 – 100 kg',  maxKg: 100, cost: 150 },
+];
+
+// Returns the flat shipping fee for a given total cart weight
+export const getShippingFee = (totalWeightKg) => {
+  for (const tier of TRANSPORT_TIERS) {
+    if (totalWeightKg <= tier.maxKg) return tier.cost;
+  }
+  return TRANSPORT_TIERS[TRANSPORT_TIERS.length - 1].cost;
+};
+
+// Returns the matching tier label for display
+export const getShippingTierLabel = (totalWeightKg) => {
+  for (const tier of TRANSPORT_TIERS) {
+    if (totalWeightKg <= tier.maxKg) return tier.label;
+  }
+  return TRANSPORT_TIERS[TRANSPORT_TIERS.length - 1].label;
+};
+
+// Calculates total estimated cart weight in kg
+export const getCartWeightKg = (items) =>
+  items.reduce((sum, item) => sum + item.qty * (UNIT_WEIGHT_KG[item.unit] ?? 1), 0);
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 export const getCategoryEmoji = (category) => CATEGORY_EMOJIS[category] || '🌽';
 export const getCategoryColor = (category) => CATEGORY_COLORS[category] || '#37474f';
 export const formatINR = (amount) =>

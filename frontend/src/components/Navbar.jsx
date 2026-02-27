@@ -3,8 +3,11 @@ import {
   AppBar, Toolbar, Typography, IconButton, Badge, Box, Button,
   Drawer, List, ListItemText, ListItemButton, Avatar, Divider,
   useMediaQuery, useTheme, Select, MenuItem, FormControl,
+  Menu,
 } from '@mui/material';
-import { Menu as MenuIcon, ShoppingCart, Logout, Agriculture, Store, Receipt } from '@mui/icons-material';
+import {
+  Menu as MenuIcon, ShoppingCart, Logout, Agriculture, Store, Receipt,
+} from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
@@ -21,8 +24,9 @@ const LANGUAGES = [
 
 export default function Navbar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [accountMenuAnchor, setAccountMenuAnchor] = useState(null);
   const { user, logout } = useAuth();
-  const { count } = useCart();
+  const { count, openDrawer } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -30,7 +34,7 @@ export default function Navbar() {
   const { t, i18n } = useTranslation();
 
   const close = () => setDrawerOpen(false);
-  const handleLogout = () => { logout(); navigate('/'); close(); };
+  const handleLogout = () => { logout(); navigate('/'); close(); setAccountMenuAnchor(null); };
   const go = (path) => { navigate(path); close(); };
 
   const handleLanguageChange = (e) => {
@@ -46,20 +50,21 @@ export default function Navbar() {
   ];
 
   const langSelect = (
-    <FormControl size="small" variant="standard" sx={{ minWidth: 90 }}>
+    <FormControl size="small" variant="standard" sx={{ minWidth: { xs: 60, sm: 90 } }}>
       <Select
         value={i18n.language || 'en'}
         onChange={handleLanguageChange}
         disableUnderline
+        renderValue={(val) => isMobile ? val.toUpperCase() : LANGUAGES.find(l => l.code === val)?.label || val}
         sx={{
           color: 'white',
           fontSize: '0.8rem',
           '& .MuiSvgIcon-root': { color: 'white' },
-          '& .MuiSelect-select': { py: 0.5, px: 1 },
+          '& .MuiSelect-select': { py: 0.5, px: { xs: 0.5, sm: 1 } },
         }}
       >
         {LANGUAGES.map(l => (
-          <MenuItem key={l.code} value={l.code} sx={{ fontSize: '0.85rem' }}>{l.label}</MenuItem>
+          <MenuItem key={l.code} value={l.code} sx={{ fontSize: '0.9rem' }}>{l.label}</MenuItem>
         ))}
       </Select>
     </FormControl>
@@ -90,14 +95,16 @@ export default function Navbar() {
             </Button>
           ))}
 
+          {/* Cart icon — opens side drawer */}
           {user?.role !== 'farmer' && (
-            <IconButton color="inherit" onClick={() => navigate('/cart')} sx={{ ml: 1 }}>
+            <IconButton color="inherit" onClick={openDrawer} sx={{ ml: 1 }}>
               <Badge badgeContent={count} color="secondary">
                 <ShoppingCart />
               </Badge>
             </IconButton>
           )}
 
+          {/* Auth buttons / user avatar */}
           {!isMobile && !user && (
             <>
               <Button color="inherit" onClick={() => navigate('/login')} sx={{ ml: 1 }}>{t('nav.login')}</Button>
@@ -112,17 +119,53 @@ export default function Navbar() {
           )}
 
           {!isMobile && user && (
-            <IconButton color="inherit" onClick={handleLogout} sx={{ ml: 1 }} title={t('nav.logout') + ' ' + user.name}>
-              <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main', fontSize: 14 }}>
-                {user.name[0].toUpperCase()}
-              </Avatar>
-            </IconButton>
+            <>
+              <IconButton
+                color="inherit"
+                onClick={e => setAccountMenuAnchor(e.currentTarget)}
+                sx={{ ml: 1 }}
+                title={user.name}
+              >
+                <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main', fontSize: 14 }}>
+                  {user.name[0].toUpperCase()}
+                </Avatar>
+              </IconButton>
+              <Menu
+                anchorEl={accountMenuAnchor}
+                open={Boolean(accountMenuAnchor)}
+                onClose={() => setAccountMenuAnchor(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                PaperProps={{ sx: { mt: 0.5, minWidth: 180 } }}
+              >
+                <Box sx={{ px: 2, py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="subtitle2" fontWeight="bold">{user.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">{user.email}</Typography>
+                </Box>
+                <MenuItem onClick={() => { navigate('/orders'); setAccountMenuAnchor(null); }}>
+                  <Receipt fontSize="small" sx={{ mr: 1.5 }} />
+                  {t('nav.orders')}
+                </MenuItem>
+                {user.role === 'farmer' && (
+                  <MenuItem onClick={() => { navigate('/farmer'); setAccountMenuAnchor(null); }}>
+                    <Agriculture fontSize="small" sx={{ mr: 1.5 }} />
+                    {t('nav.my_farm')}
+                  </MenuItem>
+                )}
+                <Divider />
+                <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
+                  <Logout fontSize="small" sx={{ mr: 1.5 }} />
+                  {t('nav.logout')}
+                </MenuItem>
+              </Menu>
+            </>
           )}
 
           <Box sx={{ ml: 1 }}>{langSelect}</Box>
         </Toolbar>
       </AppBar>
 
+      {/* Mobile side drawer */}
       <Drawer anchor="left" open={drawerOpen} onClose={close}>
         <Box sx={{ width: 260 }} role="presentation">
           <Box sx={{ p: 2, bgcolor: 'primary.main', color: 'white' }}>
@@ -149,7 +192,7 @@ export default function Navbar() {
               </ListItemButton>
             ))}
             {user?.role !== 'farmer' && (
-              <ListItemButton onClick={() => go('/cart')}>
+              <ListItemButton onClick={() => { close(); openDrawer(); }}>
                 <Box mr={1.5}>
                   <Badge badgeContent={count} color="secondary"><ShoppingCart fontSize="small" /></Badge>
                 </Box>

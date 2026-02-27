@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useCart } from '../context/CartContext';
 import api from '../api/axios';
-import { getCategoryEmoji, formatINR } from '../utils/constants';
+import { getCategoryEmoji, formatINR, getShippingTierLabel, TRANSPORT_TIERS } from '../utils/constants';
 
 const EMPTY_ADDRESS = { street: '', city: '', state: '', postalCode: '', country: '' };
 
@@ -19,11 +19,11 @@ function AddressForm({ title, values, onChange, t }) {
       <Typography variant="subtitle2" fontWeight="bold" gutterBottom>{title}</Typography>
       <Box display="flex" flexDirection="column" gap={1}>
         <TextField fullWidth size="small" label={t('cart.street')} name="street" value={values.street} onChange={onChange} />
-        <Box display="flex" gap={1}>
+        <Box display="flex" gap={1} flexDirection={{ xs: 'column', sm: 'row' }}>
           <TextField size="small" label={t('cart.city')} name="city" value={values.city} onChange={onChange} sx={{ flex: 1 }} />
           <TextField size="small" label={t('cart.state')} name="state" value={values.state} onChange={onChange} sx={{ flex: 1 }} />
         </Box>
-        <Box display="flex" gap={1}>
+        <Box display="flex" gap={1} flexDirection={{ xs: 'column', sm: 'row' }}>
           <TextField size="small" label={t('cart.postal')} name="postalCode" value={values.postalCode} onChange={onChange} sx={{ flex: 1 }} />
           <TextField size="small" label={t('cart.country')} name="country" value={values.country} onChange={onChange} sx={{ flex: 1 }} />
         </Box>
@@ -36,6 +36,7 @@ export default function CartPage() {
   const {
     items, removeItem, updateQty, clearCart,
     total, transportTotal, count,
+    totalWeightKg, shippingFee,
     voucher, applyVoucher, removeVoucher,
     discountAmount, discountedTotal,
   } = useCart();
@@ -116,15 +117,14 @@ export default function CartPage() {
         handler: async (response) => {
           try {
             // Step 3: Verify payment signature on backend
-            await api.post('/payment/verify', {
+            const verifyRes = await api.post('/payment/verify', {
               orderId: data.orderId,
               razorpayOrderId: response.razorpay_order_id,
               razorpayPaymentId: response.razorpay_payment_id,
               razorpaySignature: response.razorpay_signature,
             });
             clearCart();
-            setSnack({ open: true, msg: t('cart.order_success'), severity: 'success' });
-            setTimeout(() => navigate('/orders'), 1500);
+            navigate(`/order-confirmation/${data.orderId}`, { state: { order: verifyRes.data.order } });
           } catch (err) {
             console.error('[Payment] Verify failed:', err.response?.data || err.message);
             setSnack({ open: true, msg: err.response?.data?.message || t('cart.order_failed'), severity: 'error' });
@@ -149,7 +149,7 @@ export default function CartPage() {
 
   if (items.length === 0) {
     return (
-      <Container maxWidth="sm" sx={{ py: 8, textAlign: 'center' }}>
+      <Container maxWidth="sm" sx={{ py: 6, px: { xs: 2, sm: 3 }, textAlign: 'center' }}>
         <Typography fontSize="4rem">🛒</Typography>
         <Typography variant="h5" gutterBottom>{t('cart.empty_title')}</Typography>
         <Typography color="text.secondary" sx={{ mb: 3 }}>{t('cart.empty_body')}</Typography>
@@ -161,29 +161,29 @@ export default function CartPage() {
   }
 
   return (
-    <Container maxWidth="sm" sx={{ py: 3 }}>
+    <Container maxWidth="sm" sx={{ py: 3, px: { xs: 1.5, sm: 2 } }}>
       <Typography variant="h5" fontWeight="bold" gutterBottom>{t('cart.title')}</Typography>
 
       <Paper elevation={2} sx={{ mb: 2, borderRadius: 2, overflow: 'hidden' }}>
         {items.map((item, idx) => (
           <Box key={item.id}>
-            <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography fontSize="2.5rem" lineHeight={1}>{getCategoryEmoji(item.category)}</Typography>
+            <Box sx={{ p: { xs: 1.5, sm: 2 }, display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
+              <Typography fontSize={{ xs: '2rem', sm: '2.5rem' }} lineHeight={1} flexShrink={0}>{getCategoryEmoji(item.category)}</Typography>
               <Box flexGrow={1} minWidth={0}>
-                <Typography variant="subtitle1" fontWeight="bold" noWrap>{item.name}</Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="subtitle2" fontWeight="bold" noWrap>{item.name}</Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
                   {formatINR(item.price)}/{item.unit}
                   {item.transportCostPerUnit > 0 && ` · ${t('cart.transport_label', { amount: formatINR(item.transportCostPerUnit) })}`}
                 </Typography>
+                <Typography variant="body2" fontWeight="bold" color="primary.main">
+                  {formatINR(item.price * item.qty)}
+                </Typography>
               </Box>
-              <Box display="flex" alignItems="center" gap={0.5}>
-                <IconButton size="small" onClick={() => updateQty(item.id, item.qty - 1)}><Remove fontSize="small" /></IconButton>
-                <Typography sx={{ minWidth: 24, textAlign: 'center' }}>{item.qty}</Typography>
-                <IconButton size="small" onClick={() => updateQty(item.id, item.qty + 1)}><Add fontSize="small" /></IconButton>
-              </Box>
-              <Box textAlign="right">
-                <Typography fontWeight="bold">{formatINR(item.price * item.qty)}</Typography>
-                <IconButton size="small" color="error" onClick={() => removeItem(item.id)}><Delete fontSize="small" /></IconButton>
+              <Box display="flex" alignItems="center" gap={0.5} flexShrink={0}>
+                <IconButton size="small" onClick={() => updateQty(item.id, item.qty - 1)} sx={{ width: 32, height: 32 }}><Remove fontSize="small" /></IconButton>
+                <Typography sx={{ minWidth: 24, textAlign: 'center', fontWeight: 'bold' }}>{item.qty}</Typography>
+                <IconButton size="small" onClick={() => updateQty(item.id, item.qty + 1)} sx={{ width: 32, height: 32 }}><Add fontSize="small" /></IconButton>
+                <IconButton size="small" color="error" onClick={() => removeItem(item.id)} sx={{ width: 32, height: 32 }}><Delete fontSize="small" /></IconButton>
               </Box>
             </Box>
             {idx < items.length - 1 && <Divider />}
@@ -236,6 +236,37 @@ export default function CartPage() {
           <Typography color="text.secondary">{t('cart.subtotal', { count })}</Typography>
           <Typography fontWeight="bold">{formatINR(total)}</Typography>
         </Box>
+
+        {/* Tiered shipping fee */}
+        <Box display="flex" justifyContent="space-between" mb={0.5}>
+          <Box>
+            <Typography color="text.secondary">🚚 Shipping</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {totalWeightKg.toFixed(1)} kg · {getShippingTierLabel(totalWeightKg)}
+            </Typography>
+          </Box>
+          <Typography fontWeight="bold">{formatINR(shippingFee)}</Typography>
+        </Box>
+
+        {/* Shipping tier reference */}
+        <Box sx={{ bgcolor: 'grey.50', borderRadius: 1, px: 1.5, py: 1, mb: 1, mt: 0.5 }}>
+          <Typography variant="caption" color="text.secondary" fontWeight="bold" display="block" mb={0.5}>
+            Shipping rates
+          </Typography>
+          {TRANSPORT_TIERS.map(tier => (
+            <Box key={tier.label} display="flex" justifyContent="space-between">
+              <Typography variant="caption" color={totalWeightKg <= tier.maxKg && (tier === TRANSPORT_TIERS[0] || totalWeightKg > TRANSPORT_TIERS[TRANSPORT_TIERS.indexOf(tier) - 1]?.maxKg) ? 'primary.main' : 'text.secondary'}
+                fontWeight={getShippingTierLabel(totalWeightKg) === tier.label ? 'bold' : 'normal'}>
+                {tier.label}
+              </Typography>
+              <Typography variant="caption" color={getShippingTierLabel(totalWeightKg) === tier.label ? 'primary.main' : 'text.secondary'}
+                fontWeight={getShippingTierLabel(totalWeightKg) === tier.label ? 'bold' : 'normal'}>
+                {formatINR(tier.cost)}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+
         {transportTotal > 0 && (
           <Box display="flex" justifyContent="space-between" mb={1}>
             <Typography color="text.secondary">{t('cart.transport_cost')}</Typography>

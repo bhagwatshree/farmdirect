@@ -1,14 +1,14 @@
 import React from 'react';
 import './i18n';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { ThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import HomePage from './pages/HomePage';
-import ListingsPage from './pages/ListingsPage';
 import ProductDetailPage from './pages/ProductDetailPage';
+import OrderConfirmationPage from './pages/OrderConfirmationPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import FarmerDashboard from './pages/FarmerDashboard';
@@ -17,6 +17,7 @@ import OrdersPage from './pages/OrdersPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import ChatBot from './components/ChatBot';
+import CartDrawer from './components/CartDrawer';
 
 const theme = createTheme({
   palette: {
@@ -50,9 +51,11 @@ export default function App() {
         <CartProvider>
           <BrowserRouter>
             <Navbar />
+            <CartDrawer />
+            <Box sx={{ overflowX: 'hidden', width: '100%' }}>
             <Routes>
               <Route path="/" element={<HomePage />} />
-              <Route path="/listings" element={<ListingsPage />} />
+              <Route path="/listings" element={<HomePage />} />
               <Route path="/listings/:id" element={<ProductDetailPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
@@ -67,7 +70,11 @@ export default function App() {
               <Route path="/orders" element={
                 <ProtectedRoute><OrdersPage /></ProtectedRoute>
               } />
+              <Route path="/order-confirmation/:id" element={
+                <ProtectedRoute><OrderConfirmationPage /></ProtectedRoute>
+              } />
             </Routes>
+            </Box>
             <ChatBot />
           </BrowserRouter>
         </CartProvider>

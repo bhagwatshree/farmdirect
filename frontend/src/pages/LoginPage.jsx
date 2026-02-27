@@ -24,7 +24,7 @@ export default function LoginPage() {
     try {
       const res = await api.post('/auth/login', form);
       login(res.data.user, res.data.token);
-      navigate(res.data.user.role === 'farmer' ? '/farmer' : '/listings');
+      navigate(res.data.user.role === 'farmer' ? '/farmer' : '/');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
     } finally {

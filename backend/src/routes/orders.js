@@ -140,6 +140,23 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
+// Get single order by ID
+router.get('/:id', authenticate, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id).lean();
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    const isOwner = req.user.role === 'customer' && order.customerId === req.user.id;
+    const isFarmer = req.user.role === 'farmer' && order.items.some(i => i.farmerId === req.user.id);
+    if (!isOwner && !isFarmer) return res.status(403).json({ message: 'Forbidden' });
+
+    res.json(order);
+  } catch (error) {
+    console.error('Get order error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Farmer: update order status (optionally set estimatedDelivery)
 router.put('/:id/status', authenticate, async (req, res) => {
   try {

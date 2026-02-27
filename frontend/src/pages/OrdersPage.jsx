@@ -232,7 +232,7 @@ export default function OrdersPage() {
   if (loading) return <Box display="flex" justifyContent="center" py={8}><CircularProgress /></Box>;
 
   return (
-    <Container maxWidth="sm" sx={{ py: 3 }}>
+    <Container maxWidth="sm" sx={{ py: 3, px: { xs: 1.5, sm: 2 } }}>
       <Box display="flex" alignItems="center" gap={1} mb={3}>
         <Receipt color="primary" />
         <Typography variant="h5" fontWeight="bold">
