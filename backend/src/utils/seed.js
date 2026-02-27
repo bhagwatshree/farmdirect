@@ -291,14 +291,29 @@ const seedVouchers = [
 // ─── Seed Function ────────────────────────────────────────────────────────────
 
 module.exports = async function seed() {
-  // Farmer profiles are always upserted so story/images stay current on restart
+  // Upsert demo farmer accounts.
+  // Account credentials ($set) are refreshed on every restart.
+  // Farm story/profile fields ($setOnInsert) are only written on first create
+  // so that any edits saved by the farmer through the dashboard are preserved.
   const pw = await bcrypt.hash('Demo@1234', 10);
   for (const profile of FARMER_PROFILES) {
-    const { password, ...fields } = profile; // eslint-disable-line no-unused-vars
+    const {
+      password, // eslint-disable-line no-unused-vars
+      farmName, farmTagline, farmStory, farmImages,
+      farmingPractices, certifications, establishedYear, farmSizeAcres,
+      ...accountFields
+    } = profile;
+
     await User.findByIdAndUpdate(
       profile._id,
-      { ...fields, password: pw },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
+      {
+        $set: { ...accountFields, password: pw },       // always keep credentials current
+        $setOnInsert: {                                  // only seed profile data once
+          farmName, farmTagline, farmStory, farmImages,
+          farmingPractices, certifications, establishedYear, farmSizeAcres,
+        },
+      },
+      { upsert: true, new: true },
     );
   }
   console.log('✓ Seeded/updated demo farmer profiles');

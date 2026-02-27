@@ -41,7 +41,13 @@ router.put('/profile', authenticate, async (req, res) => {
       if (req.body[key] !== undefined) update[key] = req.body[key];
     }
 
-    const updated = await User.findByIdAndUpdate(req.user.id, update, { new: true }).select(PUBLIC_FIELDS).lean();
+    const updated = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: update },
+      { new: true },
+    ).select(PUBLIC_FIELDS).lean();
+
+    if (!updated) return res.status(404).json({ message: 'Farmer not found' });
     res.json(updated);
   } catch (err) {
     console.error('Update farmer profile error:', err);
