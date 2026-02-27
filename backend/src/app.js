@@ -14,9 +14,9 @@ app.use(helmet({
     directives: {
       ...helmet.contentSecurityPolicy.getDefaultDirectives(),
       'script-src':  ["'self'", 'https://checkout.razorpay.com'],
-      'frame-src':   ["'self'", 'https://api.razorpay.com'],
+      'frame-src':   ["'self'", 'https://api.razorpay.com', 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
       'connect-src': ["'self'", 'https://api.razorpay.com', 'https://lumberjack.razorpay.com'],
-      'img-src':     ["'self'", 'data:', 'https://cdn.razorpay.com'],
+      'img-src':     ["'self'", 'data:', 'https://cdn.razorpay.com', 'https://i.ytimg.com', 'https://images.unsplash.com'],
     },
   },
 }));

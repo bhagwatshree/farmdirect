@@ -5,7 +5,7 @@ import {
   TextField, Select, MenuItem, FormControl, InputLabel, Chip, Snackbar, Alert,
   CircularProgress, Paper, Divider, Accordion, AccordionSummary, AccordionDetails, Tooltip,
 } from '@mui/material';
-import { Add, Edit, Delete, Agriculture, AddPhotoAlternate, RemoveCircleOutline, ExpandMore, Email, Storefront, OpenInNew } from '@mui/icons-material';
+import { Add, Edit, Delete, Agriculture, AddPhotoAlternate, RemoveCircleOutline, ExpandMore, Email, Storefront, OpenInNew, VideoLibrary } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
@@ -361,7 +361,7 @@ Example: "I started farming 12 years ago on 5 acres of inherited land in Maharas
   );
 }
 
-const EMPTY_FORM = { name: '', category: 'Apple', description: '', price: '', unit: 'kg', quantity: '', location: '', images: [], transportCostPerUnit: '' };
+const EMPTY_FORM = { name: '', category: 'Apple', description: '', price: '', unit: 'kg', quantity: '', location: '', images: [], videos: [], transportCostPerUnit: '' };
 
 export default function FarmerDashboard() {
   const { user } = useAuth();
@@ -399,6 +399,7 @@ export default function FarmerDashboard() {
       name: fruit.name, category: fruit.category, description: fruit.description,
       price: fruit.price, unit: fruit.unit, quantity: fruit.quantity, location: fruit.location,
       images: fruit.images || [],
+      videos: fruit.videos || [],
       transportCostPerUnit: fruit.transportCostPerUnit !== undefined ? fruit.transportCostPerUnit : '',
     });
     setEditingId(fruit._id);
@@ -634,6 +635,41 @@ export default function FarmerDashboard() {
                     }}
                   />
                   <IconButton size="small" color="error" onClick={() => setField('images', form.images.filter((_, i) => i !== idx))}>
+                    <RemoveCircleOutline fontSize="small" />
+                  </IconButton>
+                </Box>
+              ))}
+            </Box>
+
+            {/* Videos (max 2) */}
+            <Box>
+              <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                <Typography variant="body2" fontWeight="bold">
+                  Videos ({form.videos.length}/2)
+                </Typography>
+                {form.videos.length < 2 && (
+                  <Button size="small" startIcon={<VideoLibrary />} onClick={() => setField('videos', [...form.videos, ''])}>
+                    Add Video
+                  </Button>
+                )}
+              </Box>
+              <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+                Paste a YouTube URL (e.g. https://youtube.com/watch?v=…). Max 2 videos.
+              </Typography>
+              {form.videos.map((url, idx) => (
+                <Box key={idx} display="flex" gap={1} alignItems="center" mb={1}>
+                  <TextField
+                    fullWidth size="small"
+                    label={`Video URL ${idx + 1}`}
+                    value={url}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    onChange={e => {
+                      const updated = [...form.videos];
+                      updated[idx] = e.target.value;
+                      setField('videos', updated);
+                    }}
+                  />
+                  <IconButton size="small" color="error" onClick={() => setField('videos', form.videos.filter((_, i) => i !== idx))}>
                     <RemoveCircleOutline fontSize="small" />
                   </IconButton>
                 </Box>

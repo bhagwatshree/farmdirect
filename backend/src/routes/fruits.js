@@ -57,7 +57,7 @@ router.post('/', authenticate, async (req, res) => {
   try {
     if (req.user.role !== 'farmer') return res.status(403).json({ message: 'Farmers only' });
 
-    const { name, description, price, unit, quantity, location, category, images, transportCostPerUnit } = req.body;
+    const { name, description, price, unit, quantity, location, category, images, videos, transportCostPerUnit } = req.body;
     if (!name || !price || !quantity || !category) {
       return res.status(400).json({ message: 'name, price, quantity and category are required' });
     }
@@ -74,6 +74,7 @@ router.post('/', authenticate, async (req, res) => {
       location: location || '',
       category,
       images: Array.isArray(images) ? images.filter(Boolean) : [],
+      videos: Array.isArray(videos) ? videos.filter(Boolean).slice(0, 2) : [],
       transportCostPerUnit: transportCostPerUnit !== undefined ? parseFloat(transportCostPerUnit) : 0,
     });
 
@@ -90,7 +91,7 @@ router.put('/:id', authenticate, async (req, res) => {
   try {
     if (req.user.role !== 'farmer') return res.status(403).json({ message: 'Farmers only' });
 
-    const { name, description, price, unit, quantity, location, category, images, transportCostPerUnit } = req.body;
+    const { name, description, price, unit, quantity, location, category, images, videos, transportCostPerUnit } = req.body;
 
     const updates = { updatedAt: new Date() };
     if (name !== undefined) updates.name = name;
@@ -101,6 +102,7 @@ router.put('/:id', authenticate, async (req, res) => {
     if (location !== undefined) updates.location = location;
     if (category !== undefined) updates.category = category;
     if (Array.isArray(images)) updates.images = images.filter(Boolean);
+    if (Array.isArray(videos)) updates.videos = videos.filter(Boolean).slice(0, 2);
     if (transportCostPerUnit !== undefined) updates.transportCostPerUnit = parseFloat(transportCostPerUnit);
 
     const fruit = await Fruit.findOneAndUpdate(

@@ -174,10 +174,30 @@ const seedFruits = [
     farmerId: 'demo-farmer-1',
     farmerName: 'Green Valley Farm',
     name: 'Organic Apples',
-    description: 'Fresh crispy organic apples, hand-picked from our century-old orchard. No pesticides used.',
+    description:
+`Grown in the mineral-rich volcanic soil of California's rolling hills, our Organic Apples are hand-picked at peak ripeness — never rushed, never machine-harvested.
+
+🍎 Crisp & Flavourful
+Our Fuji-Gala blend delivers a satisfying crunch and perfectly balanced sweetness. The volcanic soil imparts a depth of flavour you simply won't find in supermarket apples.
+
+🌿 Certified Organic Since 1993
+No synthetic pesticides, herbicides or fertilizers have touched our orchard in over 30 years. We rely on compost, cover crops and natural predator insects to keep our trees thriving.
+
+📦 Packed Within 24 Hours of Harvest
+Shipped directly from our farm to your door — no extended cold storage, no waxing, no compromise on freshness.`,
     price: 2.50, unit: 'kg', quantity: 150, location: 'California, USA', category: 'Apple',
     transportCostPerUnit: 0.50,
-    images: [`${BASE}/photo-1570913149827-d2ac84ab3f9a${Q}`, `${BASE}/photo-1568702846914-96b305d2aaeb${Q}`],
+    images: [
+      `${BASE}/photo-1570913149827-d2ac84ab3f9a${Q}`,  // [0] red apples closeup
+      `${BASE}/photo-1568702846914-96b305d2aaeb${Q}`,  // [1] sliced apple
+      `${BASE}/photo-1506905925346-21bda4d32df4${Q}`,  // [2] green apples in bowl
+      `${BASE}/photo-1471585620403-52fc31d6bebb${Q}`,  // [3] apples in basket
+      `${BASE}/photo-1459171486003-74efa6eba9c1${Q}`,  // [4] fresh apples pile
+    ],
+    videos: [
+      'https://www.youtube.com/watch?v=jNQXAC9IVRw',  // placeholder video 1 — replace with actual farm footage
+      'https://www.youtube.com/watch?v=9bZkp7q19f0',  // placeholder video 2 — replace with harvest/orchard tour
+    ],
   },
   {
     _id: uuidv4(),
@@ -288,6 +308,13 @@ module.exports = async function seed() {
     await Fruit.insertMany(seedFruits);
     console.log('✓ Seeded fruits');
   }
+
+  // Always keep demo product content fresh (description, images, videos)
+  const appleDemo = seedFruits[0]; // Organic Apples
+  await Fruit.findOneAndUpdate(
+    { farmerId: 'demo-farmer-1', name: 'Organic Apples' },
+    { $set: { description: appleDemo.description, images: appleDemo.images, videos: appleDemo.videos } },
+  );
 
   const voucherCount = await Voucher.countDocuments();
   if (voucherCount === 0) {

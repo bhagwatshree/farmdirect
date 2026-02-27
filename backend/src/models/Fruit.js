@@ -14,6 +14,7 @@ const fruitSchema = new mongoose.Schema(
     category: { type: String, required: true },
     transportCostPerUnit: { type: Number, default: 0 },
     images: [{ type: String }],
+    videos: [{ type: String }],   // max 2 video URLs (YouTube or direct)
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   },

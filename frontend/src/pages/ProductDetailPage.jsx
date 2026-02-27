@@ -3,7 +3,7 @@ import {
   Container, Box, Typography, Button, Chip, Divider, CircularProgress,
   Snackbar, Alert, Paper, IconButton, Grid,
 } from '@mui/material';
-import { LocationOn, Person, Add, Remove, ArrowBack, NavigateNext } from '@mui/icons-material';
+import { LocationOn, Person, Add, Remove, ArrowBack, NavigateNext, PlayCircle } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import api from '../api/axios';
@@ -12,6 +12,65 @@ import { useCart } from '../context/CartContext';
 import ImageCarousel from '../components/ImageCarousel';
 import FruitCard from '../components/FruitCard';
 import { formatINR } from '../utils/constants';
+
+// ── Video helpers ─────────────────────────────────────────────────────────────
+function getYouTubeId(url) {
+  const m = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+function VideoPlayer({ url, title }) {
+  const [playing, setPlaying] = useState(false);
+  const ytId = getYouTubeId(url);
+
+  if (ytId) {
+    const thumb = `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`;
+    return (
+      <Box sx={{ position: 'relative', paddingTop: '56.25%', borderRadius: 2, overflow: 'hidden', bgcolor: '#000' }}>
+        {playing ? (
+          <iframe
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
+            src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0`}
+            title={title || 'Product video'}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        ) : (
+          <Box
+            onClick={() => setPlaying(true)}
+            sx={{
+              position: 'absolute', inset: 0, cursor: 'pointer',
+              backgroundImage: `url(${thumb})`,
+              backgroundSize: 'cover', backgroundPosition: 'center',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              '&:hover .play-icon': { transform: 'scale(1.12)' },
+              '&::after': { content: '""', position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,0.22)' },
+            }}
+          >
+            <PlayCircle
+              className="play-icon"
+              sx={{
+                fontSize: { xs: 56, sm: 72 }, color: 'rgba(255,255,255,0.93)',
+                transition: 'transform 0.2s', zIndex: 1,
+                filter: 'drop-shadow(0 2px 10px rgba(0,0,0,0.6))',
+              }}
+            />
+          </Box>
+        )}
+      </Box>
+    );
+  }
+
+  // Direct video file (mp4, webm, etc.)
+  return (
+    <Box sx={{ borderRadius: 2, overflow: 'hidden', bgcolor: '#000' }}>
+      <video controls style={{ width: '100%', display: 'block', maxHeight: 320 }} src={url}>
+        <track kind="captions" />
+      </video>
+    </Box>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ProductDetailPage() {
   const { id } = useParams();
@@ -180,10 +239,24 @@ export default function ProductDetailPage() {
       {fruit.description && (
         <Paper elevation={1} sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: 2 }}>
           <Typography variant="h6" fontWeight="bold" gutterBottom>Know Your Product</Typography>
-          <Typography variant="body1" color="text.secondary" lineHeight={1.8}>
+          <Typography variant="body1" color="text.secondary" lineHeight={1.8} sx={{ whiteSpace: 'pre-line' }}>
             {fruit.description}
           </Typography>
         </Paper>
+      )}
+
+      {/* Videos */}
+      {fruit.videos?.length > 0 && (
+        <Box mb={3}>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>🎬 See It in Action</Typography>
+          <Grid container spacing={2}>
+            {fruit.videos.map((url, idx) => (
+              <Grid item xs={12} sm={fruit.videos.length === 1 ? 12 : 6} key={idx}>
+                <VideoPlayer url={url} title={`${fruit.name} — video ${idx + 1}`} />
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
       )}
 
       {/* Similar Products */}
