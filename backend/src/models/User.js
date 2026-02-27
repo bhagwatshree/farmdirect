@@ -29,6 +29,15 @@ const userSchema = new mongoose.Schema(
     resetTokenExpiry: { type: Date, default: null },
     chatOtp:          { type: String, default: null },
     chatOtpExpiry:    { type: Date,   default: null },
+    // Farmer profile / farm story
+    farmName:         { type: String, default: '' },
+    farmTagline:      { type: String, default: '' },
+    farmStory:        { type: String, default: '' },
+    farmImages:       [{ type: String }],
+    farmingPractices: [{ type: String }],
+    certifications:   [{ type: String }],
+    establishedYear:  { type: Number, default: null },
+    farmSizeAcres:    { type: Number, default: null },
   },
   { _id: false }
 );

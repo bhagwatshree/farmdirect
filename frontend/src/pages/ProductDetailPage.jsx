@@ -112,7 +112,13 @@ export default function ProductDetailPage() {
               {/* Farmer & location */}
               <Box display="flex" alignItems="center" gap={1} mb={1}>
                 <Person fontSize="small" color="action" />
-                <Typography variant="body2">{fruit.farmerName}</Typography>
+                <Typography
+                  variant="body2" color="primary"
+                  sx={{ cursor: 'pointer', fontWeight: 500, '&:hover': { textDecoration: 'underline' } }}
+                  onClick={() => navigate(`/farm/${fruit.farmerId}`)}
+                >
+                  {fruit.farmerName}
+                </Typography>
               </Box>
               <Box display="flex" alignItems="center" gap={1} mb={2}>
                 <LocationOn fontSize="small" color="action" />

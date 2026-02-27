@@ -5,8 +5,9 @@ import {
   TextField, Select, MenuItem, FormControl, InputLabel, Chip, Snackbar, Alert,
   CircularProgress, Paper, Divider, Accordion, AccordionSummary, AccordionDetails, Tooltip,
 } from '@mui/material';
-import { Add, Edit, Delete, Agriculture, AddPhotoAlternate, RemoveCircleOutline, ExpandMore, Email } from '@mui/icons-material';
+import { Add, Edit, Delete, Agriculture, AddPhotoAlternate, RemoveCircleOutline, ExpandMore, Email, Storefront, OpenInNew } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { getTemplates, updateTemplates, resetTemplates } from '../api/notifications';
 import { useAuth } from '../context/AuthContext';
@@ -138,6 +139,228 @@ function NotificationsTab({ setSnack }) {
   );
 }
 
+const PRACTICE_OPTIONS = [
+  'Organic Farming', 'Natural Farming', 'Drip Irrigation', 'Chemical Free',
+  'Traditional Methods', 'Rain-fed Agriculture', 'Poly-culture', 'Permaculture',
+];
+
+const EMPTY_FARM = {
+  farmName: '', farmTagline: '', farmStory: '',
+  farmImages: [], farmingPractices: [], certifications: [],
+  establishedYear: '', farmSizeAcres: '',
+};
+
+function FarmStoryTab({ userId, setSnack }) {
+  const [profile, setProfile] = useState(EMPTY_FARM);
+  const [saving, setSaving] = useState(false);
+  const [certInput, setCertInput] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    api.get(`/farmers/${userId}`)
+      .then(res => {
+        const f = res.data.farmer;
+        setProfile({
+          farmName: f.farmName || '',
+          farmTagline: f.farmTagline || '',
+          farmStory: f.farmStory || '',
+          farmImages: f.farmImages || [],
+          farmingPractices: f.farmingPractices || [],
+          certifications: f.certifications || [],
+          establishedYear: f.establishedYear || '',
+          farmSizeAcres: f.farmSizeAcres || '',
+        });
+      })
+      .catch(() => {});
+  }, [userId]);
+
+  const setField = (key, val) => setProfile(p => ({ ...p, [key]: val }));
+
+  const togglePractice = (p) => setProfile(prev => ({
+    ...prev,
+    farmingPractices: prev.farmingPractices.includes(p)
+      ? prev.farmingPractices.filter(x => x !== p)
+      : [...prev.farmingPractices, p],
+  }));
+
+  const addCert = () => {
+    const v = certInput.trim();
+    if (v && !profile.certifications.includes(v)) {
+      setField('certifications', [...profile.certifications, v]);
+    }
+    setCertInput('');
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.put('/farmers/profile', {
+        ...profile,
+        establishedYear: profile.establishedYear ? Number(profile.establishedYear) : null,
+        farmSizeAcres: profile.farmSizeAcres ? Number(profile.farmSizeAcres) : null,
+      });
+      setSnack({ open: true, msg: 'Farm profile saved!', severity: 'success' });
+    } catch {
+      setSnack({ open: true, msg: 'Failed to save farm profile.', severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Box>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={1}>
+        <Typography variant="body2" color="text.secondary">
+          Tell your story — customers love knowing who grows their food 🌱
+        </Typography>
+        <Button
+          size="small" variant="outlined" startIcon={<OpenInNew fontSize="small" />}
+          onClick={() => navigate(`/farm/${userId}`)}
+        >
+          Preview Public Page
+        </Button>
+      </Box>
+
+      <Box display="flex" flexDirection="column" gap={2.5}>
+        {/* Basic info */}
+        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
+          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>🏡 Your Farm</Typography>
+          <Box display="flex" flexDirection="column" gap={2}>
+            <TextField
+              fullWidth label="Farm Name" placeholder="e.g. Green Valley Organic Farm"
+              value={profile.farmName} onChange={e => setField('farmName', e.target.value)}
+            />
+            <TextField
+              fullWidth label="Tagline" placeholder="e.g. Grown with love, delivered fresh"
+              value={profile.farmTagline} onChange={e => setField('farmTagline', e.target.value)}
+              helperText="A short, catchy line that appears below your farm name"
+            />
+            <Box display="flex" gap={2} flexDirection={{ xs: 'column', sm: 'row' }}>
+              <TextField
+                label="Established Year" type="number" value={profile.establishedYear}
+                onChange={e => setField('establishedYear', e.target.value)}
+                inputProps={{ min: 1900, max: new Date().getFullYear() }}
+                sx={{ flex: 1 }}
+              />
+              <TextField
+                label="Farm Size (acres)" type="number" value={profile.farmSizeAcres}
+                onChange={e => setField('farmSizeAcres', e.target.value)}
+                inputProps={{ min: 0, step: 0.1 }}
+                sx={{ flex: 1 }}
+              />
+            </Box>
+          </Box>
+        </Paper>
+
+        {/* Our Story */}
+        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
+          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>📖 Our Story</Typography>
+          <TextField
+            fullWidth multiline rows={6}
+            label="Tell customers about your farm"
+            placeholder={`Share your journey — why you started farming, what makes your farm special, how you care for your crops...
+
+Example: "I started farming 12 years ago on 5 acres of inherited land in Maharashtra. My grandfather always said the soil tells you what it needs — and I've followed that wisdom ever since. We grow mangoes the old-fashioned way: no chemicals, just patience and sunlight..."`}
+            value={profile.farmStory}
+            onChange={e => setField('farmStory', e.target.value)}
+            helperText={`${profile.farmStory.length} characters — aim for 200–500 words for best impact`}
+          />
+        </Paper>
+
+        {/* Farming practices */}
+        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
+          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>🌿 Farming Practices</Typography>
+          <Typography variant="body2" color="text.secondary" mb={1.5}>
+            Select all that apply — these appear as trust badges on your farm page
+          </Typography>
+          <Box display="flex" flexWrap="wrap" gap={1}>
+            {PRACTICE_OPTIONS.map(p => (
+              <Chip
+                key={p} label={p}
+                onClick={() => togglePractice(p)}
+                color={profile.farmingPractices.includes(p) ? 'success' : 'default'}
+                variant={profile.farmingPractices.includes(p) ? 'filled' : 'outlined'}
+                sx={{ cursor: 'pointer' }}
+              />
+            ))}
+          </Box>
+        </Paper>
+
+        {/* Certifications */}
+        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
+          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>🏅 Certifications</Typography>
+          <Typography variant="body2" color="text.secondary" mb={1.5}>
+            Add certifications like FSSAI, Organic India, PGS-India, etc.
+          </Typography>
+          <Box display="flex" gap={1} mb={1.5}>
+            <TextField
+              size="small" label="Add certification" value={certInput}
+              onChange={e => setCertInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCert(); } }}
+              sx={{ flex: 1 }}
+            />
+            <Button variant="outlined" onClick={addCert} disabled={!certInput.trim()}>Add</Button>
+          </Box>
+          <Box display="flex" flexWrap="wrap" gap={1}>
+            {profile.certifications.map(c => (
+              <Chip key={c} label={c} color="primary" variant="outlined"
+                onDelete={() => setField('certifications', profile.certifications.filter(x => x !== c))}
+              />
+            ))}
+            {profile.certifications.length === 0 && (
+              <Typography variant="caption" color="text.secondary">No certifications added yet</Typography>
+            )}
+          </Box>
+        </Paper>
+
+        {/* Farm images */}
+        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+            <Typography variant="subtitle1" fontWeight="bold">📸 Farm Photos</Typography>
+            {profile.farmImages.length < 5 && (
+              <Button size="small" startIcon={<AddPhotoAlternate />}
+                onClick={() => setField('farmImages', [...profile.farmImages, ''])}
+              >
+                Add Photo
+              </Button>
+            )}
+          </Box>
+          <Typography variant="body2" color="text.secondary" mb={1.5}>
+            Add up to 5 photos of your farm, fields, or harvest
+          </Typography>
+          {profile.farmImages.length === 0 && (
+            <Typography variant="caption" color="text.secondary">No photos added yet</Typography>
+          )}
+          {profile.farmImages.map((url, idx) => (
+            <Box key={idx} display="flex" gap={1} alignItems="center" mb={1}>
+              <TextField
+                fullWidth size="small" label={`Photo ${idx + 1} URL`} value={url}
+                placeholder="https://example.com/my-farm.jpg"
+                onChange={e => {
+                  const updated = [...profile.farmImages];
+                  updated[idx] = e.target.value;
+                  setField('farmImages', updated);
+                }}
+              />
+              <IconButton size="small" color="error"
+                onClick={() => setField('farmImages', profile.farmImages.filter((_, i) => i !== idx))}
+              >
+                <RemoveCircleOutline fontSize="small" />
+              </IconButton>
+            </Box>
+          ))}
+        </Paper>
+
+        <Box display="flex" justifyContent="flex-end">
+          <Button variant="contained" size="large" onClick={handleSave} disabled={saving} startIcon={<Storefront />}>
+            {saving ? 'Saving…' : 'Save Farm Profile'}
+          </Button>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
 const EMPTY_FORM = { name: '', category: 'Apple', description: '', price: '', unit: 'kg', quantity: '', location: '', images: [], transportCostPerUnit: '' };
 
 export default function FarmerDashboard() {
@@ -229,9 +452,10 @@ export default function FarmerDashboard() {
         <Typography variant="h5" fontWeight="bold">{t('farmer.dashboard_title')}</Typography>
       </Box>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }} variant="scrollable" scrollButtons="auto">
         <Tab label={t('farmer.tab_listings', { count: listings.length })} />
         <Tab label={t('farmer.tab_orders', { count: orders.length })} />
+        <Tab icon={<Storefront fontSize="small" />} iconPosition="start" label="My Farm Story" />
         <Tab icon={<Email fontSize="small" />} iconPosition="start" label={t('farmer.tab_notifications')} />
       </Tabs>
 
@@ -348,7 +572,8 @@ export default function FarmerDashboard() {
         )
       )}
 
-      {tab === 2 && <NotificationsTab setSnack={setSnack} />}
+      {tab === 2 && <FarmStoryTab userId={user.id} setSnack={setSnack} />}
+      {tab === 3 && <NotificationsTab setSnack={setSnack} />}
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{editingId ? t('farmer.dialog_edit') : t('farmer.dialog_add')}</DialogTitle>

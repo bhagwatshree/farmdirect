@@ -9,6 +9,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import HomePage from './pages/HomePage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import OrderConfirmationPage from './pages/OrderConfirmationPage';
+import FarmerProfilePage from './pages/FarmerProfilePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import FarmerDashboard from './pages/FarmerDashboard';
@@ -75,6 +76,7 @@ export default function App() {
               <Route path="/order-confirmation/:id" element={
                 <ProtectedRoute><OrderConfirmationPage /></ProtectedRoute>
               } />
+              <Route path="/farm/:id" element={<FarmerProfilePage />} />
             </Routes>
             </Box>
             <CartBottomBar />

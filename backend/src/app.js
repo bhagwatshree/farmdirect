@@ -44,6 +44,7 @@ app.use('/api/vouchers', require('./routes/vouchers'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/payment', require('./routes/payment'));
+app.use('/api/farmers', require('./routes/farmers'));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'Backend is running!' });
