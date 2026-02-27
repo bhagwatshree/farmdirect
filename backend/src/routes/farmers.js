@@ -41,6 +41,10 @@ router.put('/profile', authenticate, async (req, res) => {
       if (req.body[key] !== undefined) update[key] = req.body[key];
     }
 
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ message: 'No valid fields to update' });
+    }
+
     const updated = await User.findByIdAndUpdate(
       req.user.id,
       { $set: update },

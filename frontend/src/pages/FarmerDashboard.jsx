@@ -150,6 +150,19 @@ const EMPTY_FARM = {
   establishedYear: '', farmSizeAcres: '',
 };
 
+function applyFarmerData(f) {
+  return {
+    farmName: f.farmName || '',
+    farmTagline: f.farmTagline || '',
+    farmStory: f.farmStory || '',
+    farmImages: (f.farmImages || []).filter(Boolean),
+    farmingPractices: f.farmingPractices || [],
+    certifications: f.certifications || [],
+    establishedYear: f.establishedYear || '',
+    farmSizeAcres: f.farmSizeAcres || '',
+  };
+}
+
 function FarmStoryTab({ userId, setSnack }) {
   const [profile, setProfile] = useState(EMPTY_FARM);
   const [saving, setSaving] = useState(false);
@@ -157,21 +170,12 @@ function FarmStoryTab({ userId, setSnack }) {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!userId) return;
     api.get(`/farmers/${userId}`)
-      .then(res => {
-        const f = res.data.farmer;
-        setProfile({
-          farmName: f.farmName || '',
-          farmTagline: f.farmTagline || '',
-          farmStory: f.farmStory || '',
-          farmImages: f.farmImages || [],
-          farmingPractices: f.farmingPractices || [],
-          certifications: f.certifications || [],
-          establishedYear: f.establishedYear || '',
-          farmSizeAcres: f.farmSizeAcres || '',
-        });
-      })
-      .catch(() => {});
+      .then(res => setProfile(applyFarmerData(res.data.farmer)))
+      .catch(err => {
+        console.error('[FarmStoryTab] load error:', err.response?.status, err.response?.data);
+      });
   }, [userId]);
 
   const setField = (key, val) => setProfile(p => ({ ...p, [key]: val }));
@@ -194,14 +198,19 @@ function FarmStoryTab({ userId, setSnack }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.put('/farmers/profile', {
+      const res = await api.put('/farmers/profile', {
         ...profile,
+        farmImages: profile.farmImages.filter(Boolean),   // strip empty URL entries
         establishedYear: profile.establishedYear ? Number(profile.establishedYear) : null,
         farmSizeAcres: profile.farmSizeAcres ? Number(profile.farmSizeAcres) : null,
       });
+      // Sync local state from the server-confirmed data
+      setProfile(applyFarmerData(res.data));
       setSnack({ open: true, msg: 'Farm profile saved!', severity: 'success' });
-    } catch {
-      setSnack({ open: true, msg: 'Failed to save farm profile.', severity: 'error' });
+    } catch (err) {
+      console.error('[FarmStoryTab] save error:', err.response?.status, err.response?.data);
+      const msg = err.response?.data?.message || 'Failed to save farm profile.';
+      setSnack({ open: true, msg, severity: 'error' });
     } finally {
       setSaving(false);
     }
