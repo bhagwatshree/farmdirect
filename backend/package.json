@@ -45,6 +45,7 @@
   "license": "ISC",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@aws-sdk/rds-signer": "^3.540.0",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
     "cors": "^2.8.5",

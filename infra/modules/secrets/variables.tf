@@ -1,0 +1,10 @@
+variable "project_name" {}
+variable "environment" {}
+variable "jwt_secret" { sensitive = true }
+variable "openai_api_key" { sensitive = true }
+variable "razorpay_key_id" { sensitive = true }
+variable "razorpay_key_secret" { sensitive = true }
+variable "razorpay_webhook_secret" { sensitive = true }
+variable "email_from" {}
+variable "email_user" {}
+variable "email_pass" { sensitive = true }

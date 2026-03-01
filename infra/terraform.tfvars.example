@@ -1,0 +1,26 @@
+# Copy this file to terraform.tfvars and fill in your values
+# NEVER commit terraform.tfvars — it contains secrets
+
+aws_region    = "ap-south-1"
+project_name  = "farmdirect"
+environment   = "prod"
+
+# ECS Fargate sizing
+desired_count = 2
+cpu           = 512    # 0.5 vCPU
+memory        = 1024   # 1 GB
+
+# DocumentDB
+docdb_instance_class  = "db.t3.medium"
+docdb_master_username = "farmdirect_admin"
+docdb_master_password = "CHANGE_ME_USE_A_STRONG_PASSWORD"
+
+# Application secrets
+jwt_secret              = ""
+openai_api_key          = "sk-..."
+razorpay_key_id         = "rzp_live_..."
+razorpay_key_secret     = ""
+razorpay_webhook_secret = ""
+email_from              = "FarmDirect <noreply@farmdirect.com>"
+email_user              = "your-email@gmail.com"
+email_pass              = "your-app-specific-password"
