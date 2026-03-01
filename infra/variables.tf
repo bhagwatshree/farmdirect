@@ -89,6 +89,18 @@ variable "email_user" {
   type = string
 }
 
+variable "email_host" {
+  description = "SMTP host for sending emails"
+  type        = string
+  default     = "smtp.gmail.com"
+}
+
+variable "email_port" {
+  description = "SMTP port for sending emails"
+  type        = string
+  default     = "587"
+}
+
 variable "email_pass" {
   type      = string
   sensitive = true

@@ -22,6 +22,8 @@ module "secrets" {
   razorpay_key_secret     = var.razorpay_key_secret
   razorpay_webhook_secret = var.razorpay_webhook_secret
   email_from              = var.email_from
+  email_host              = var.email_host
+  email_port              = var.email_port
   email_user              = var.email_user
   email_pass              = var.email_pass
   docdb_host              = module.documentdb.cluster_endpoint
