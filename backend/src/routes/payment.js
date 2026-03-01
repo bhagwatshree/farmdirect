@@ -43,7 +43,7 @@ router.post('/create-order', authenticate, async (req, res) => {
       return res.status(403).json({ message: 'Customers only' });
     }
 
-    const { items, billingAddress, deliveryAddress, voucherCode } = req.body;
+    const { items, billingAddress, deliveryAddress, voucherCode, shippingPayment, shippingFee: clientShippingFee } = req.body;
     if (!items || items.length === 0) {
       return res.status(400).json({ message: 'No items in order' });
     }
@@ -98,14 +98,34 @@ router.post('/create-order', authenticate, async (req, res) => {
     }
 
     const { discountAmount = 0, voucher } = voucherResult;
-    const total = parseFloat(Math.max(0, subtotal + transportCost - discountAmount).toFixed(2));
+    const shippingFee = parseFloat((clientShippingFee || 0).toFixed(2));
+    const shippingCosts = parseFloat((shippingFee + transportCost).toFixed(2));
+    const total = parseFloat(Math.max(0, subtotal + shippingCosts - discountAmount).toFixed(2));
 
-    // Create Razorpay order (amount in paise)
+    // Determine online vs COD split for shipping
+    const isShippingCod = shippingPayment === 'cod';
+    const codAmount = isShippingCod ? shippingCosts : 0;
+    const onlineAmount = parseFloat(Math.max(0, total - codAmount).toFixed(2));
+
+    // Create Razorpay order (amount in paise — only the online portion)
     const rzpOrder = await razorpay.orders.create({
-      amount: Math.round(total * 100), // paise
+      amount: Math.round(onlineAmount * 100), // paise
       currency: 'INR',
       receipt: uuidv4(),
     });
+
+    // Build per-farmer status entries
+    const farmerMap = {};
+    for (const oi of orderItems) {
+      if (!farmerMap[oi.farmerId]) {
+        farmerMap[oi.farmerId] = { farmerId: oi.farmerId, farmerName: oi.farmerName };
+      }
+    }
+    const itemStatuses = Object.values(farmerMap).map(f => ({
+      farmerId: f.farmerId,
+      farmerName: f.farmerName,
+      status: 'payment_pending',
+    }));
 
     // Save DB order with payment_pending status
     const orderId = uuidv4();
@@ -116,8 +136,12 @@ router.post('/create-order', authenticate, async (req, res) => {
       billingAddress: billingAddress || {},
       deliveryAddress: deliveryAddress || billingAddress || {},
       items: orderItems,
+      itemStatuses,
       subtotal,
+      shippingFee,
       transportCost,
+      shippingPayment: isShippingCod ? 'cod' : 'online',
+      codAmount,
       voucherCode: voucherCode ? voucherCode.toUpperCase() : null,
       discountAmount,
       total,
@@ -163,28 +187,28 @@ router.post('/verify', authenticate, async (req, res) => {
       return res.status(400).json({ message: 'Payment verification failed. Invalid signature.' });
     }
 
-    const existing = await Order.findById(orderId);
-    if (!existing) return res.status(404).json({ message: 'Order not found' });
-
-    const order = await Order.findByIdAndUpdate(
-      orderId,
-      {
-        status: 'payment_complete',
-        razorpayPaymentId,
-        paidAt: new Date(),
-        $push: {
-          transactions: {
-            type: 'payment',
-            amount: existing.total,
-            razorpayId: razorpayPaymentId,
-            status: 'captured',
-          },
-        },
-      },
-      { new: true }
-    );
-
+    const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    order.status = 'payment_complete';
+    order.razorpayPaymentId = razorpayPaymentId;
+    order.paidAt = new Date();
+    order.transactions.push({
+      type: 'payment',
+      amount: order.total,
+      razorpayId: razorpayPaymentId,
+      status: 'captured',
+    });
+
+    // Sync per-farmer sub-statuses
+    if (order.itemStatuses && order.itemStatuses.length > 0) {
+      for (const entry of order.itemStatuses) {
+        entry.status = 'payment_complete';
+        entry.updatedAt = new Date();
+      }
+    }
+
+    await order.save();
 
     notifyOrderCreated(order).catch(err => console.error('[Notify] orderCreated:', err.message));
 

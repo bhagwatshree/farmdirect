@@ -50,6 +50,16 @@ function OrderCard({ order, userRole, onCancelled }) {
   const willRefund = ['payment_complete', 'pending', 'confirmed', 'accepted'].includes(order.status) && order.razorpayPaymentId;
   const hasTransactions = order.transactions && order.transactions.length > 0;
 
+  // Group items by farmer for multi-farmer display
+  const itemsByFarmer = {};
+  for (const item of order.items) {
+    if (!itemsByFarmer[item.farmerId]) {
+      itemsByFarmer[item.farmerId] = { farmerName: item.farmerName, items: [] };
+    }
+    itemsByFarmer[item.farmerId].items.push(item);
+  }
+  const hasMultipleFarmers = Object.keys(itemsByFarmer).length > 1;
+
   const handleCancel = async () => {
     setCancelling(true);
     try {
@@ -75,11 +85,14 @@ function OrderCard({ order, userRole, onCancelled }) {
             {new Date(order.createdAt).toLocaleString()}
           </Typography>
         </Box>
-        <Chip
-          label={STATUS_LABELS[order.status] || order.status.toUpperCase()}
-          color={STATUS_COLORS[order.status] || 'default'}
-          size="small"
-        />
+        {/* Show overall status chip only for single-farmer orders or farmer view */}
+        {(!hasMultipleFarmers || userRole === 'farmer') && (
+          <Chip
+            label={STATUS_LABELS[order.status] || order.status.toUpperCase()}
+            color={STATUS_COLORS[order.status] || 'default'}
+            size="small"
+          />
+        )}
       </Box>
 
       {userRole === 'farmer' && (
@@ -90,15 +103,52 @@ function OrderCard({ order, userRole, onCancelled }) {
 
       <Divider sx={{ mb: 1 }} />
 
-      {/* Items */}
-      {order.items.map((item, idx) => (
-        <Box key={idx} display="flex" justifyContent="space-between" py={0.5}>
-          <Typography variant="body2">
-            {getCategoryEmoji(item.category)} {item.fruitName} × {item.quantity} {item.unit}
-          </Typography>
-          <Typography variant="body2" fontWeight="bold">{formatINR(item.subtotal)}</Typography>
-        </Box>
-      ))}
+      {/* Items grouped by farmer for multi-farmer orders (customer view) */}
+      {hasMultipleFarmers && userRole === 'customer' ? (
+        Object.entries(itemsByFarmer).map(([farmerId, { farmerName, items: farmerItems }], groupIdx) => {
+          const farmerStatus = order.itemStatuses?.find(s => s.farmerId === farmerId);
+          return (
+            <Box key={farmerId}>
+              {groupIdx > 0 && <Divider sx={{ my: 1 }} />}
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                <Typography variant="caption" fontWeight="bold" color="text.secondary">
+                  From: {farmerName}
+                </Typography>
+                {farmerStatus && (
+                  <Chip
+                    label={STATUS_LABELS[farmerStatus.status] || farmerStatus.status.replace(/_/g, ' ').toUpperCase()}
+                    color={STATUS_COLORS[farmerStatus.status] || 'default'}
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
+              </Box>
+              {farmerItems.map((item, idx) => (
+                <Box key={idx} display="flex" justifyContent="space-between" py={0.5}>
+                  <Typography variant="body2">
+                    {getCategoryEmoji(item.category)} {item.fruitName} × {item.quantity} {item.unit}
+                  </Typography>
+                  <Typography variant="body2" fontWeight="bold">{formatINR(item.subtotal)}</Typography>
+                </Box>
+              ))}
+              {farmerStatus?.estimatedDelivery && (
+                <Typography variant="caption" color="text.secondary">
+                  Est. Delivery: {new Date(farmerStatus.estimatedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </Typography>
+              )}
+            </Box>
+          );
+        })
+      ) : (
+        order.items.map((item, idx) => (
+          <Box key={idx} display="flex" justifyContent="space-between" py={0.5}>
+            <Typography variant="body2">
+              {getCategoryEmoji(item.category)} {item.fruitName} × {item.quantity} {item.unit}
+            </Typography>
+            <Typography variant="body2" fontWeight="bold">{formatINR(item.subtotal)}</Typography>
+          </Box>
+        ))
+      )}
 
       <Divider sx={{ mt: 1, mb: 1 }} />
 
@@ -109,6 +159,20 @@ function OrderCard({ order, userRole, onCancelled }) {
           {formatINR(order.total)}
         </Typography>
       </Box>
+
+      {/* COD amount indicator */}
+      {order.shippingPayment === 'cod' && order.codAmount > 0 && (
+        <>
+          <Box display="flex" justifyContent="space-between" mb={0.5}>
+            <Typography variant="caption" color="text.secondary">Paid online</Typography>
+            <Typography variant="caption" fontWeight="bold">{formatINR(order.total - order.codAmount)}</Typography>
+          </Box>
+          <Box display="flex" justifyContent="space-between" mb={0.5}>
+            <Typography variant="caption" color="warning.main">Cash on Delivery</Typography>
+            <Typography variant="caption" fontWeight="bold" color="warning.main">{formatINR(order.codAmount)}</Typography>
+          </Box>
+        </>
+      )}
 
       {/* Payment status row (only for payment-related statuses or if paidAt set) */}
       {(PAYMENT_STATUSES.includes(order.status) || order.paidAt) && (

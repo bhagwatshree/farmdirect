@@ -44,7 +44,7 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(403).json({ message: 'Customers only' });
     }
 
-    const { items, billingAddress, deliveryAddress, voucherCode } = req.body;
+    const { items, billingAddress, deliveryAddress, voucherCode, shippingPayment, shippingFee: clientShippingFee } = req.body;
     if (!items || items.length === 0) {
       return res.status(400).json({ message: 'No items in order' });
     }
@@ -91,7 +91,24 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     const { discountAmount = 0, voucher } = voucherResult;
-    const total = parseFloat(Math.max(0, subtotal + transportCost - discountAmount).toFixed(2));
+    const shippingFee = parseFloat((clientShippingFee || 0).toFixed(2));
+    const shippingCosts = parseFloat((shippingFee + transportCost).toFixed(2));
+    const total = parseFloat(Math.max(0, subtotal + shippingCosts - discountAmount).toFixed(2));
+    const isShippingCod = shippingPayment === 'cod';
+    const codAmount = isShippingCod ? shippingCosts : 0;
+
+    // Build per-farmer status entries
+    const farmerMap = {};
+    for (const oi of orderItems) {
+      if (!farmerMap[oi.farmerId]) {
+        farmerMap[oi.farmerId] = { farmerId: oi.farmerId, farmerName: oi.farmerName };
+      }
+    }
+    const itemStatuses = Object.values(farmerMap).map(f => ({
+      farmerId: f.farmerId,
+      farmerName: f.farmerName,
+      status: 'pending',
+    }));
 
     const order = new Order({
       _id: uuidv4(),
@@ -100,11 +117,16 @@ router.post('/', authenticate, async (req, res) => {
       billingAddress: billingAddress || {},
       deliveryAddress: deliveryAddress || billingAddress || {},
       items: orderItems,
+      itemStatuses,
       subtotal,
+      shippingFee,
       transportCost,
+      shippingPayment: isShippingCod ? 'cod' : 'online',
+      codAmount,
       voucherCode: voucherCode ? voucherCode.toUpperCase() : null,
       discountAmount,
       total,
+      status: 'pending',
     });
 
     await order.save();
@@ -157,6 +179,38 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
+// Helper: derive top-level order status from per-farmer itemStatuses
+function deriveOrderStatus(itemStatuses) {
+  if (!itemStatuses || itemStatuses.length === 0) return 'pending';
+
+  const statuses = itemStatuses.map(s => s.status);
+
+  // If all farmers have the same status, use that
+  if (statuses.every(s => s === statuses[0])) return statuses[0];
+
+  // Priority order for deriving aggregate status (lowest progress wins)
+  const priority = [
+    'payment_pending', 'payment_authorized', 'payment_captured', 'payment_failed',
+    'payment_complete', 'pending', 'confirmed', 'accepted', 'rejected',
+    'shipped', 'delivered', 'cancelled',
+  ];
+
+  // If any farmer rejected, show rejected
+  if (statuses.includes('rejected')) return 'rejected';
+  // If any farmer cancelled, show cancelled
+  if (statuses.includes('cancelled')) return 'cancelled';
+  // If any payment failure, show that
+  if (statuses.includes('payment_failed')) return 'payment_failed';
+
+  // Otherwise use the least-progressed fulfillment status
+  let minIdx = priority.length;
+  for (const s of statuses) {
+    const idx = priority.indexOf(s);
+    if (idx >= 0 && idx < minIdx) minIdx = idx;
+  }
+  return priority[minIdx] || 'pending';
+}
+
 // Farmer: update order status (optionally set estimatedDelivery)
 router.put('/:id/status', authenticate, async (req, res) => {
   try {
@@ -167,13 +221,33 @@ router.put('/:id/status', authenticate, async (req, res) => {
       return res.status(400).json({ message: 'Invalid status' });
     }
 
-    const update = { status: req.body.status };
-    if (req.body.estimatedDelivery) {
-      update.estimatedDelivery = new Date(req.body.estimatedDelivery);
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    // Update the farmer's entry in itemStatuses
+    const farmerEntry = order.itemStatuses.find(s => s.farmerId === req.user.id);
+    if (!farmerEntry) {
+      return res.status(403).json({ message: 'You have no items in this order' });
     }
 
-    const order = await Order.findByIdAndUpdate(req.params.id, update, { new: true });
-    if (!order) return res.status(404).json({ message: 'Order not found' });
+    farmerEntry.status = req.body.status;
+    farmerEntry.updatedAt = new Date();
+    if (req.body.estimatedDelivery) {
+      farmerEntry.estimatedDelivery = new Date(req.body.estimatedDelivery);
+    }
+
+    // Derive top-level status from all farmer sub-statuses
+    order.status = deriveOrderStatus(order.itemStatuses);
+
+    // Also set top-level estimatedDelivery to the latest among all farmers
+    const allDeliveryDates = order.itemStatuses
+      .map(s => s.estimatedDelivery)
+      .filter(Boolean);
+    if (allDeliveryDates.length > 0) {
+      order.estimatedDelivery = new Date(Math.max(...allDeliveryDates.map(d => d.getTime())));
+    }
+
+    await order.save();
 
     notifyStatusChanged(order, req.user).catch(err => console.error('[Notify] statusChanged:', err.message));
 

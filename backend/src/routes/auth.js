@@ -6,6 +6,8 @@ const { v4: uuidv4 } = require('uuid');
 const User = require('../models/User');
 const { sendEmail } = require('../utils/notifications');
 
+const authenticate = require('../middleware/auth');
+
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -161,6 +163,54 @@ router.post('/reset-password', async (req, res) => {
     res.json({ message: 'Password reset successfully' });
   } catch (error) {
     console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/auth/profile — return user profile with addresses
+router.get('/profile', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select(
+      'name email phone location billingAddress deliveryAddress savedAddresses'
+    ).lean();
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PUT /api/auth/profile/address — save a new address to savedAddresses
+router.put('/profile/address', authenticate, async (req, res) => {
+  try {
+    const { label, street, city, state, postalCode, country, isDefault } = req.body;
+    if (!street || !city || !state || !postalCode) {
+      return res.status(400).json({ message: 'Street, city, state and postal code are required' });
+    }
+
+    const newAddress = { label: label || '', street, city, state, postalCode, country: country || '', isDefault: !!isDefault };
+
+    const update = { $push: { savedAddresses: newAddress } };
+
+    // If this is set as default, also update billingAddress
+    if (isDefault) {
+      update.$set = {
+        billingAddress: { street, city, state, postalCode, country: country || '' },
+      };
+      // Unset isDefault on all other saved addresses
+      await User.updateOne(
+        { _id: req.user.id },
+        { $set: { 'savedAddresses.$[].isDefault': false } }
+      );
+    }
+
+    const user = await User.findByIdAndUpdate(req.user.id, update, { new: true })
+      .select('billingAddress deliveryAddress savedAddresses').lean();
+
+    res.json(user);
+  } catch (error) {
+    console.error('Save address error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

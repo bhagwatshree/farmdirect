@@ -525,57 +525,66 @@ export default function FarmerDashboard() {
           <Box display="flex" flexDirection="column" gap={2}>
             {orders.map(order => (
               <Paper key={order._id} sx={{ p: 2, borderRadius: 2 }}>
-                <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={1} mb={1}>
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight="bold">
-                      {t('orders.order')} {formatOrderId(order._id)}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {order.customerName} · {new Date(order.createdAt).toLocaleDateString()}
-                    </Typography>
-                    {order.estimatedDelivery && (
-                      <Typography variant="caption" color="success.main">
-                        📅 Est. Delivery: {new Date(order.estimatedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </Typography>
-                    )}
-                  </Box>
-                  <Box display="flex" flexDirection="column" gap={1} alignItems="flex-end">
-                    {/* Only show status dropdown for non-terminal statuses */}
-                    {!['cancelled', 'delivered', 'rejected'].includes(order.status) && (
-                      <FormControl size="small" sx={{ minWidth: 140 }}>
-                        <Select value={FARMER_STATUSES.includes(order.status) ? order.status : ''} onChange={e => handleStatusChange(order._id, e.target.value)}>
-                          {FARMER_STATUSES.map(s => (
-                            <MenuItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    )}
-                    {/* Delivery date — shown when setting accepted/confirmed */}
-                    {['payment_complete', 'pending', 'confirmed', 'accepted'].includes(order.status) && (
-                      <TextField
-                        type="date" size="small" label="Est. Delivery Date"
-                        InputLabelProps={{ shrink: true }}
-                        value={deliveryDates[order._id] || (order.estimatedDelivery ? order.estimatedDelivery.slice(0, 10) : '')}
-                        onChange={e => setDeliveryDates(d => ({ ...d, [order._id]: e.target.value }))}
-                        inputProps={{ min: new Date().toISOString().slice(0, 10) }}
-                        sx={{ width: 175 }}
-                      />
-                    )}
-                  </Box>
-                </Box>
-                <Divider sx={{ my: 1 }} />
-                {order.items.filter(i => i.farmerId === user.id).map((item, idx) => (
-                  <Box key={idx} display="flex" justifyContent="space-between" py={0.5}>
-                    <Typography variant="body2">
-                      {getCategoryEmoji(item.category)} {item.fruitName} × {item.quantity} {item.unit}
-                    </Typography>
-                    <Typography variant="body2" fontWeight="bold">{formatINR(item.subtotal)}</Typography>
-                  </Box>
-                ))}
-                <Divider sx={{ mt: 1 }} />
-                <Box display="flex" justifyContent="flex-end" mt={1}>
-                  <Chip label={order.status.replace(/_/g, ' ').toUpperCase()} color={STATUS_COLORS[order.status]} size="small" />
-                </Box>
+                {(() => {
+                  const myStatus = order.itemStatuses?.find(s => s.farmerId === user.id);
+                  const farmerStatus = myStatus?.status || order.status;
+                  const farmerDelivery = myStatus?.estimatedDelivery || order.estimatedDelivery;
+                  return (
+                    <>
+                      <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={1} mb={1}>
+                        <Box>
+                          <Typography variant="subtitle1" fontWeight="bold">
+                            {t('orders.order')} {formatOrderId(order._id)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {order.customerName} · {new Date(order.createdAt).toLocaleDateString()}
+                          </Typography>
+                          {farmerDelivery && (
+                            <Typography variant="caption" color="success.main">
+                              📅 Est. Delivery: {new Date(farmerDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </Typography>
+                          )}
+                        </Box>
+                        <Box display="flex" flexDirection="column" gap={1} alignItems="flex-end">
+                          {/* Only show status dropdown for non-terminal statuses */}
+                          {!['cancelled', 'delivered', 'rejected'].includes(farmerStatus) && (
+                            <FormControl size="small" sx={{ minWidth: 140 }}>
+                              <Select value={FARMER_STATUSES.includes(farmerStatus) ? farmerStatus : ''} onChange={e => handleStatusChange(order._id, e.target.value)}>
+                                {FARMER_STATUSES.map(s => (
+                                  <MenuItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          )}
+                          {/* Delivery date — shown when setting accepted/confirmed */}
+                          {['payment_complete', 'pending', 'confirmed', 'accepted'].includes(farmerStatus) && (
+                            <TextField
+                              type="date" size="small" label="Est. Delivery Date"
+                              InputLabelProps={{ shrink: true }}
+                              value={deliveryDates[order._id] || (farmerDelivery ? new Date(farmerDelivery).toISOString().slice(0, 10) : '')}
+                              onChange={e => setDeliveryDates(d => ({ ...d, [order._id]: e.target.value }))}
+                              inputProps={{ min: new Date().toISOString().slice(0, 10) }}
+                              sx={{ width: 175 }}
+                            />
+                          )}
+                        </Box>
+                      </Box>
+                      <Divider sx={{ my: 1 }} />
+                      {order.items.filter(i => i.farmerId === user.id).map((item, idx) => (
+                        <Box key={idx} display="flex" justifyContent="space-between" py={0.5}>
+                          <Typography variant="body2">
+                            {getCategoryEmoji(item.category)} {item.fruitName} × {item.quantity} {item.unit}
+                          </Typography>
+                          <Typography variant="body2" fontWeight="bold">{formatINR(item.subtotal)}</Typography>
+                        </Box>
+                      ))}
+                      <Divider sx={{ mt: 1 }} />
+                      <Box display="flex" justifyContent="flex-end" mt={1}>
+                        <Chip label={farmerStatus.replace(/_/g, ' ').toUpperCase()} color={STATUS_COLORS[farmerStatus]} size="small" />
+                      </Box>
+                    </>
+                  );
+                })()}
               </Paper>
             ))}
           </Box>

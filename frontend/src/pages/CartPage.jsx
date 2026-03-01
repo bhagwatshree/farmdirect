@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container, Typography, Box, Button, Paper, Divider, IconButton,
   Snackbar, Alert, CircularProgress, TextField, Checkbox, FormControlLabel,
-  Chip,
+  Chip, FormControl, InputLabel, Select, MenuItem, Radio, RadioGroup,
 } from '@mui/material';
 import { Add, Remove, Delete, ShoppingCartCheckout, LocalOffer } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -13,18 +13,34 @@ import { getCategoryEmoji, formatINR, getShippingTierLabel, TRANSPORT_TIERS } fr
 
 const EMPTY_ADDRESS = { street: '', city: '', state: '', postalCode: '', country: '' };
 
+function isAddressValid(addr) {
+  return addr && addr.street?.trim() && addr.city?.trim() && addr.state?.trim() && addr.postalCode?.trim();
+}
+
+function addressesMatch(a, b) {
+  if (!a || !b) return false;
+  return a.street === b.street && a.city === b.city && a.state === b.state
+    && a.postalCode === b.postalCode && a.country === b.country;
+}
+
+function formatAddressLabel(addr, fallbackLabel) {
+  if (!addr) return fallbackLabel;
+  const parts = [addr.street, addr.city, addr.state, addr.postalCode].filter(Boolean);
+  return parts.length > 0 ? parts.join(', ') : fallbackLabel;
+}
+
 function AddressForm({ title, values, onChange, t }) {
   return (
     <Box>
       <Typography variant="subtitle2" fontWeight="bold" gutterBottom>{title}</Typography>
       <Box display="flex" flexDirection="column" gap={1}>
-        <TextField fullWidth size="small" label={t('cart.street')} name="street" value={values.street} onChange={onChange} />
+        <TextField fullWidth size="small" label={t('cart.street')} name="street" value={values.street} onChange={onChange} required />
         <Box display="flex" gap={1} flexDirection={{ xs: 'column', sm: 'row' }}>
-          <TextField size="small" label={t('cart.city')} name="city" value={values.city} onChange={onChange} sx={{ flex: 1 }} />
-          <TextField size="small" label={t('cart.state')} name="state" value={values.state} onChange={onChange} sx={{ flex: 1 }} />
+          <TextField size="small" label={t('cart.city')} name="city" value={values.city} onChange={onChange} sx={{ flex: 1 }} required />
+          <TextField size="small" label={t('cart.state')} name="state" value={values.state} onChange={onChange} sx={{ flex: 1 }} required />
         </Box>
         <Box display="flex" gap={1} flexDirection={{ xs: 'column', sm: 'row' }}>
-          <TextField size="small" label={t('cart.postal')} name="postalCode" value={values.postalCode} onChange={onChange} sx={{ flex: 1 }} />
+          <TextField size="small" label={t('cart.postal')} name="postalCode" value={values.postalCode} onChange={onChange} sx={{ flex: 1 }} required />
           <TextField size="small" label={t('cart.country')} name="country" value={values.country} onChange={onChange} sx={{ flex: 1 }} />
         </Box>
       </Box>
@@ -49,11 +65,66 @@ export default function CartPage() {
   const [voucherCode, setVoucherCode] = useState('');
   const [voucherLoading, setVoucherLoading] = useState(false);
   const [voucherError, setVoucherError] = useState('');
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressIdx, setSelectedAddressIdx] = useState('profile');
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [shippingPayment, setShippingPayment] = useState('online');
   const navigate = useNavigate();
   const { t } = useTranslation();
 
+  // Fetch profile and pre-populate addresses on mount
+  const fetchProfile = useCallback(async () => {
+    try {
+      const { data } = await api.get('/auth/profile');
+      const billing = data.billingAddress || {};
+      const delivery = data.deliveryAddress || {};
+      const saved = data.savedAddresses || [];
+
+      // Pre-populate billing address from profile
+      if (isAddressValid(billing)) {
+        setBillingAddress({ ...EMPTY_ADDRESS, ...billing });
+      }
+      if (isAddressValid(delivery) && !addressesMatch(billing, delivery)) {
+        setDeliveryAddress({ ...EMPTY_ADDRESS, ...delivery });
+        setSameAsBilling(false);
+      }
+      setSavedAddresses(saved);
+      setProfileLoaded(true);
+    } catch {
+      // If profile fetch fails (e.g. not logged in), continue with empty fields
+      setProfileLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => { fetchProfile(); }, [fetchProfile]);
+
   const handleAddressChange = (setter) => (e) => {
     setter(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  // Handle saved address selection
+  const handleAddressSelect = (e) => {
+    const value = e.target.value;
+    setSelectedAddressIdx(value);
+
+    if (value === 'new') {
+      setBillingAddress({ ...EMPTY_ADDRESS });
+    } else if (value === 'profile') {
+      // Reset will be handled by profile data (already loaded)
+      fetchProfile();
+    } else {
+      const idx = parseInt(value, 10);
+      const addr = savedAddresses[idx];
+      if (addr) {
+        setBillingAddress({
+          street: addr.street || '',
+          city: addr.city || '',
+          state: addr.state || '',
+          postalCode: addr.postalCode || '',
+          country: addr.country || '',
+        });
+      }
+    }
   };
 
   const handleApplyVoucher = async () => {
@@ -81,7 +152,34 @@ export default function CartPage() {
       document.body.appendChild(script);
     });
 
+  // Save address if it's new (not matching any existing saved address or profile address)
+  const saveNewAddressIfNeeded = async (addr) => {
+    try {
+      const isAlreadySaved = savedAddresses.some(sa => addressesMatch(sa, addr));
+      if (!isAlreadySaved) {
+        await api.put('/auth/profile/address', {
+          label: `Address ${savedAddresses.length + 1}`,
+          ...addr,
+        });
+      }
+    } catch {
+      // Non-critical — don't block checkout if save fails
+    }
+  };
+
   const handleCheckout = async () => {
+    const deliveryAddr = sameAsBlling ? billingAddress : deliveryAddress;
+
+    // Validate address before proceeding
+    if (!isAddressValid(billingAddress)) {
+      setSnack({ open: true, msg: 'Please fill in all required billing address fields.', severity: 'error' });
+      return;
+    }
+    if (!sameAsBlling && !isAddressValid(deliveryAddr)) {
+      setSnack({ open: true, msg: 'Please fill in all required delivery address fields.', severity: 'error' });
+      return;
+    }
+
     setLoading(true);
     try {
       const loaded = await loadRazorpayScript();
@@ -90,15 +188,22 @@ export default function CartPage() {
         return;
       }
 
-      const orderItems = items.map(i => ({ fruitId: i.id, quantity: i.qty }));
-      const deliveryAddr = sameAsBlling ? billingAddress : deliveryAddress;
+      // Save new address in background if it differs from saved ones
+      saveNewAddressIfNeeded(billingAddress);
+      if (!sameAsBlling) {
+        saveNewAddressIfNeeded(deliveryAddr);
+      }
 
-      // Step 1: Create order on backend → get Razorpay order details
+      const orderItems = items.map(i => ({ fruitId: i.id, quantity: i.qty }));
+
+      // Step 1: Create order on backend -> get Razorpay order details
       const { data } = await api.post('/payment/create-order', {
         items: orderItems,
         billingAddress,
         deliveryAddress: deliveryAddr,
         voucherCode: voucher ? voucher.code : undefined,
+        shippingPayment,
+        shippingFee,
       });
 
       // Step 2: Open Razorpay checkout
@@ -146,6 +251,10 @@ export default function CartPage() {
     }
     // Don't call setLoading(false) here — it stays true until payment modal closes
   };
+
+  const billingValid = isAddressValid(billingAddress);
+  const deliveryValid = sameAsBlling || isAddressValid(deliveryAddress);
+  const canCheckout = billingValid && deliveryValid && !loading;
 
   if (items.length === 0) {
     return (
@@ -218,7 +327,29 @@ export default function CartPage() {
 
       <Paper elevation={2} sx={{ p: 2, mb: 2, borderRadius: 2 }}>
         <Typography variant="subtitle1" fontWeight="bold" gutterBottom>{t('cart.delivery_info')}</Typography>
+
+        {/* Address selector — only show if there are saved addresses */}
+        {profileLoaded && savedAddresses.length > 0 && (
+          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+            <InputLabel>Select Address</InputLabel>
+            <Select value={selectedAddressIdx} onChange={handleAddressSelect} label="Select Address">
+              <MenuItem value="profile">Profile Address</MenuItem>
+              {savedAddresses.map((addr, idx) => (
+                <MenuItem key={idx} value={String(idx)}>
+                  {addr.label || formatAddressLabel(addr, `Address ${idx + 1}`)}
+                </MenuItem>
+              ))}
+              <MenuItem value="new">Enter New Address</MenuItem>
+            </Select>
+          </FormControl>
+        )}
+
         <AddressForm title={t('cart.billing_address')} values={billingAddress} onChange={handleAddressChange(setBillingAddress)} t={t} />
+        {!billingValid && profileLoaded && (
+          <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+            Please fill in street, city, state and postal code
+          </Typography>
+        )}
         <FormControlLabel
           sx={{ mt: 1.5 }}
           control={<Checkbox checked={sameAsBlling} onChange={e => setSameAsBilling(e.target.checked)} name="sameAsBlling" />}
@@ -227,6 +358,11 @@ export default function CartPage() {
         {!sameAsBlling && (
           <Box mt={1}>
             <AddressForm title={t('cart.delivery_address')} values={deliveryAddress} onChange={handleAddressChange(setDeliveryAddress)} t={t} />
+            {!deliveryValid && (
+              <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+                Please fill in street, city, state and postal code
+              </Typography>
+            )}
           </Box>
         )}
       </Paper>
@@ -273,6 +409,20 @@ export default function CartPage() {
             <Typography fontWeight="bold">{formatINR(transportTotal)}</Typography>
           </Box>
         )}
+
+        {/* Shipping payment option */}
+        {(shippingFee > 0 || transportTotal > 0) && (
+          <Box sx={{ bgcolor: 'grey.50', borderRadius: 1, px: 1.5, py: 1, mb: 1 }}>
+            <Typography variant="caption" fontWeight="bold" color="text.secondary" display="block" mb={0.5}>
+              Shipping & transport payment
+            </Typography>
+            <RadioGroup row value={shippingPayment} onChange={e => setShippingPayment(e.target.value)}>
+              <FormControlLabel value="online" control={<Radio size="small" />} label={<Typography variant="body2">Pay now</Typography>} />
+              <FormControlLabel value="cod" control={<Radio size="small" />} label={<Typography variant="body2">Cash on Delivery</Typography>} />
+            </RadioGroup>
+          </Box>
+        )}
+
         {discountAmount > 0 && (
           <Box display="flex" justifyContent="space-between" mb={1}>
             <Typography color="success.main">{t('cart.voucher_discount')}</Typography>
@@ -284,16 +434,35 @@ export default function CartPage() {
           <Typography variant="h6">{t('cart.total')}</Typography>
           <Typography variant="h6" color="primary" fontWeight="bold">{formatINR(discountedTotal)}</Typography>
         </Box>
+        {shippingPayment === 'cod' && (shippingFee > 0 || transportTotal > 0) && (
+          <>
+            <Box display="flex" justifyContent="space-between" mt={0.5}>
+              <Typography variant="body2" color="text.secondary">Pay online now</Typography>
+              <Typography variant="body2" fontWeight="bold">{formatINR(discountedTotal - shippingFee - transportTotal)}</Typography>
+            </Box>
+            <Box display="flex" justifyContent="space-between" mt={0.5}>
+              <Typography variant="body2" color="warning.main">Cash on Delivery</Typography>
+              <Typography variant="body2" fontWeight="bold" color="warning.main">{formatINR(shippingFee + transportTotal)}</Typography>
+            </Box>
+          </>
+        )}
       </Paper>
 
       <Button
         variant="contained" fullWidth size="large"
         startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <ShoppingCartCheckout />}
         onClick={handleCheckout}
-        disabled={loading}
+        disabled={!canCheckout}
       >
-        {loading ? t('cart.placing') : t('cart.place_order', { amount: formatINR(discountedTotal) })}
+        {loading ? t('cart.placing') : t('cart.place_order', {
+          amount: formatINR(shippingPayment === 'cod' ? Math.max(0, discountedTotal - shippingFee - transportTotal) : discountedTotal),
+        })}
       </Button>
+      {shippingPayment === 'cod' && (shippingFee > 0 || transportTotal > 0) && (
+        <Typography variant="caption" color="warning.main" textAlign="center" display="block" mt={0.5}>
+          + {formatINR(shippingFee + transportTotal)} to be collected on delivery
+        </Typography>
+      )}
 
       <Snackbar
         open={snack.open} autoHideDuration={3000}

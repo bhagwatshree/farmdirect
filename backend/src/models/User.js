@@ -22,6 +22,17 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, default: '' },
     billingAddress: { type: addressSchema, default: () => ({}) },
     deliveryAddress: { type: addressSchema, default: () => ({}) },
+    savedAddresses: [
+      {
+        label: { type: String, default: '' },
+        street: { type: String, default: '' },
+        city: { type: String, default: '' },
+        state: { type: String, default: '' },
+        postalCode: { type: String, default: '' },
+        country: { type: String, default: '' },
+        isDefault: { type: Boolean, default: false },
+      },
+    ],
     createdAt: { type: Date, default: Date.now },
     loginAttempts:    { type: Number, default: 0 },
     locked:           { type: Boolean, default: false },

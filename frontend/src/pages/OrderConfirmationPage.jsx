@@ -68,23 +68,60 @@ export default function OrderConfirmationPage() {
 
         <Divider />
 
-        {/* Items */}
+        {/* Items — grouped by farmer if multi-farmer order */}
         <Box sx={{ px: 2.5, py: 1.5 }}>
           <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Items Ordered</Typography>
-          {order.items.map((item, idx) => (
-            <Box key={idx} display="flex" justifyContent="space-between" alignItems="center" py={0.75}>
-              <Box display="flex" alignItems="center" gap={1}>
-                <Typography fontSize="1.4rem">{getCategoryEmoji(item.category)}</Typography>
-                <Box>
-                  <Typography variant="body2" fontWeight="bold">{item.fruitName}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {item.quantity} {item.unit} × {formatINR(item.pricePerUnit)}
-                  </Typography>
+          {(() => {
+            const farmerGroups = {};
+            for (const item of order.items) {
+              if (!farmerGroups[item.farmerId]) {
+                farmerGroups[item.farmerId] = { farmerName: item.farmerName, items: [] };
+              }
+              farmerGroups[item.farmerId].items.push(item);
+            }
+            const farmers = Object.entries(farmerGroups);
+            const isMultiFarmer = farmers.length > 1;
+
+            return farmers.map(([farmerId, { farmerName, items: farmerItems }], groupIdx) => {
+              const farmerStatus = order.itemStatuses?.find(s => s.farmerId === farmerId);
+              return (
+                <Box key={farmerId}>
+                  {isMultiFarmer && (
+                    <>
+                      {groupIdx > 0 && <Divider sx={{ my: 1 }} />}
+                      <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                        <Typography variant="caption" fontWeight="bold" color="text.secondary">
+                          From: {farmerName}
+                        </Typography>
+                        {farmerStatus && (
+                          <Chip
+                            label={STATUS_LABELS[farmerStatus.status] || farmerStatus.status.replace(/_/g, ' ').toUpperCase()}
+                            color={STATUS_COLORS[farmerStatus.status] || 'default'}
+                            size="small"
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
+                    </>
+                  )}
+                  {farmerItems.map((item, idx) => (
+                    <Box key={idx} display="flex" justifyContent="space-between" alignItems="center" py={0.75}>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Typography fontSize="1.4rem">{getCategoryEmoji(item.category)}</Typography>
+                        <Box>
+                          <Typography variant="body2" fontWeight="bold">{item.fruitName}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {item.quantity} {item.unit} × {formatINR(item.pricePerUnit)}
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Typography variant="body2" fontWeight="bold">{formatINR(item.subtotal)}</Typography>
+                    </Box>
+                  ))}
                 </Box>
-              </Box>
-              <Typography variant="body2" fontWeight="bold">{formatINR(item.subtotal)}</Typography>
-            </Box>
-          ))}
+              );
+            });
+          })()}
         </Box>
 
         <Divider />
@@ -95,10 +132,10 @@ export default function OrderConfirmationPage() {
             <Typography variant="body2" color="text.secondary">Subtotal</Typography>
             <Typography variant="body2">{formatINR(order.subtotal)}</Typography>
           </Box>
-          {order.transportCost > 0 && (
+          {(order.shippingFee > 0 || order.transportCost > 0) && (
             <Box display="flex" justifyContent="space-between" mb={0.5}>
-              <Typography variant="body2" color="text.secondary">Shipping</Typography>
-              <Typography variant="body2">{formatINR(order.transportCost)}</Typography>
+              <Typography variant="body2" color="text.secondary">Shipping & Transport</Typography>
+              <Typography variant="body2">{formatINR((order.shippingFee || 0) + (order.transportCost || 0))}</Typography>
             </Box>
           )}
           {order.discountAmount > 0 && (
@@ -111,11 +148,23 @@ export default function OrderConfirmationPage() {
           )}
           <Divider sx={{ my: 1 }} />
           <Box display="flex" justifyContent="space-between">
-            <Typography variant="subtitle1" fontWeight="bold">Total Paid</Typography>
+            <Typography variant="subtitle1" fontWeight="bold">Total</Typography>
             <Typography variant="subtitle1" fontWeight="bold" color="primary.main">
               {formatINR(order.total)}
             </Typography>
           </Box>
+          {order.shippingPayment === 'cod' && order.codAmount > 0 && (
+            <>
+              <Box display="flex" justifyContent="space-between" mt={0.5}>
+                <Typography variant="body2" color="text.secondary">Paid online</Typography>
+                <Typography variant="body2" fontWeight="bold">{formatINR(order.total - order.codAmount)}</Typography>
+              </Box>
+              <Box display="flex" justifyContent="space-between" mt={0.5}>
+                <Typography variant="body2" color="warning.main">Cash on Delivery (shipping)</Typography>
+                <Typography variant="body2" fontWeight="bold" color="warning.main">{formatINR(order.codAmount)}</Typography>
+              </Box>
+            </>
+          )}
         </Box>
 
         {/* Payment info */}

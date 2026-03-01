@@ -27,6 +27,16 @@ function verifyWebhookSignature(rawBody, signature) {
   return expected === signature;
 }
 
+// Sync all itemStatuses to a given payment status
+function syncItemStatuses(order, status) {
+  if (order.itemStatuses && order.itemStatuses.length > 0) {
+    for (const entry of order.itemStatuses) {
+      entry.status = status;
+      entry.updatedAt = new Date();
+    }
+  }
+}
+
 // Restore stock when a payment fails
 async function restoreStock(order) {
   for (const item of order.items) {
@@ -70,6 +80,7 @@ router.post('/razorpay', express.raw({ type: 'application/json' }), async (req, 
         if (order.status === 'payment_pending') {
           order.status = 'payment_authorized';
           order.razorpayPaymentId = payment.id;
+          syncItemStatuses(order, 'payment_authorized');
           await order.save();
           console.log(`[Webhook] Order ${order._id} → payment_authorized`);
 
@@ -96,6 +107,7 @@ router.post('/razorpay', express.raw({ type: 'application/json' }), async (req, 
           order.status = 'payment_complete';
           order.razorpayPaymentId = payment.id;
           order.paidAt = new Date(payment.created_at * 1000);
+          syncItemStatuses(order, 'payment_complete');
           await order.save();
           console.log(`[Webhook] Order ${order._id} → payment_complete`);
 
@@ -119,6 +131,7 @@ router.post('/razorpay', express.raw({ type: 'application/json' }), async (req, 
           order.status = 'payment_complete';
           order.razorpayPaymentId = payment.id;
           order.paidAt = new Date(payment.created_at * 1000);
+          syncItemStatuses(order, 'payment_complete');
           await order.save();
           console.log(`[Webhook] Order ${order._id} → payment_complete (order.paid)`);
 
@@ -140,6 +153,7 @@ router.post('/razorpay', express.raw({ type: 'application/json' }), async (req, 
         if (order.status === 'payment_pending' || order.status === 'payment_authorized') {
           order.status = 'payment_failed';
           order.razorpayPaymentId = payment.id;
+          syncItemStatuses(order, 'payment_failed');
           await order.save();
           console.log(`[Webhook] Order ${order._id} → payment_failed`);
 
