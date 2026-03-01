@@ -25,25 +25,28 @@ resource "aws_ecs_task_definition" "app" {
     environment = [
       { name = "NODE_ENV", value = "production" },
       { name = "PORT", value = tostring(var.container_port) },
-      { name = "DOCDB_IAM_AUTH", value = "true" },
-      { name = "DOCDB_HOST", value = var.docdb_host },
-      { name = "DOCDB_PORT", value = tostring(var.docdb_port) },
-      { name = "DOCDB_USERNAME", value = var.docdb_username },
-      { name = "DOCDB_DATABASE", value = "farmdirect" },
       { name = "AWS_REGION", value = var.aws_region },
     ]
 
     secrets = [
+      # App secrets
       { name = "JWT_SECRET", valueFrom = "${var.secrets_arn}:JWT_SECRET::" },
       { name = "OPENAI_API_KEY", valueFrom = "${var.secrets_arn}:OPENAI_API_KEY::" },
       { name = "RAZORPAY_KEY_ID", valueFrom = "${var.secrets_arn}:RAZORPAY_KEY_ID::" },
       { name = "RAZORPAY_KEY_SECRET", valueFrom = "${var.secrets_arn}:RAZORPAY_KEY_SECRET::" },
       { name = "RAZORPAY_WEBHOOK_SECRET", valueFrom = "${var.secrets_arn}:RAZORPAY_WEBHOOK_SECRET::" },
+      # Email credentials
       { name = "EMAIL_FROM", valueFrom = "${var.secrets_arn}:EMAIL_FROM::" },
       { name = "EMAIL_HOST", valueFrom = "${var.secrets_arn}:EMAIL_HOST::" },
       { name = "EMAIL_PORT", valueFrom = "${var.secrets_arn}:EMAIL_PORT::" },
       { name = "EMAIL_USER", valueFrom = "${var.secrets_arn}:EMAIL_USER::" },
       { name = "EMAIL_PASS", valueFrom = "${var.secrets_arn}:EMAIL_PASS::" },
+      # DocumentDB credentials
+      { name = "DOCDB_HOST", valueFrom = "${var.secrets_arn}:DOCDB_HOST::" },
+      { name = "DOCDB_PORT", valueFrom = "${var.secrets_arn}:DOCDB_PORT::" },
+      { name = "DOCDB_USERNAME", valueFrom = "${var.secrets_arn}:DOCDB_USERNAME::" },
+      { name = "DOCDB_PASSWORD", valueFrom = "${var.secrets_arn}:DOCDB_PASSWORD::" },
+      { name = "DOCDB_DATABASE", valueFrom = "${var.secrets_arn}:DOCDB_DATABASE::" },
     ]
 
     logConfiguration = {

@@ -11,6 +11,7 @@
   },
   "jest": {
     "testEnvironment": "node",
+    "setupFiles": ["./src/__tests__/setup.js"],
     "globalSetup": "./src/__tests__/globalSetup.js",
     "globalTeardown": "./src/__tests__/globalTeardown.js",
     "testTimeout": 60000,
@@ -18,7 +19,8 @@
       "/node_modules/",
       "src/__tests__/globalSetup\\.js$",
       "src/__tests__/globalTeardown\\.js$",
-      "src/__tests__/helpers/"
+      "src/__tests__/helpers/",
+      "src/__tests__/setup\\.js$"
     ],
     "collectCoverageFrom": [
       "src/**/*.js",

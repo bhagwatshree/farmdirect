@@ -161,49 +161,54 @@ describe('POST /api/vouchers', () => {
 
 // ── POST /validate ───────────────────────────────────────────────────────────
 describe('POST /api/vouchers/validate', () => {
+  it('returns 401 without auth', async () => {
+    const res = await request(app).post('/api/vouchers/validate').send({ code: 'TEST10', subtotal: 30 });
+    expect(res.status).toBe(401);
+  });
+
   it('returns 400 when code is missing', async () => {
-    const res = await request(app).post('/api/vouchers/validate').send({ subtotal: 10 });
+    const res = await request(app).post('/api/vouchers/validate').set('Authorization', `Bearer ${authToken}`).send({ subtotal: 10 });
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/code is required/i);
   });
 
   it('returns 404 for a non-existent code', async () => {
-    const res = await request(app).post('/api/vouchers/validate').send({ code: 'GHOST' });
+    const res = await request(app).post('/api/vouchers/validate').set('Authorization', `Bearer ${authToken}`).send({ code: 'GHOST' });
     expect(res.status).toBe(404);
     expect(res.body.valid).toBe(false);
   });
 
   it('returns 400 for an inactive voucher', async () => {
     await Voucher.create(seedVoucher({ code: 'OFF', isActive: false }));
-    const res = await request(app).post('/api/vouchers/validate').send({ code: 'OFF' });
+    const res = await request(app).post('/api/vouchers/validate').set('Authorization', `Bearer ${authToken}`).send({ code: 'OFF' });
     expect(res.status).toBe(400);
     expect(res.body.valid).toBe(false);
   });
 
   it('returns 400 for an expired voucher', async () => {
     await Voucher.create(seedVoucher({ code: 'OLD', expiresAt: '2000-01-01T00:00:00Z' }));
-    const res = await request(app).post('/api/vouchers/validate').send({ code: 'OLD' });
+    const res = await request(app).post('/api/vouchers/validate').set('Authorization', `Bearer ${authToken}`).send({ code: 'OLD' });
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/expired/i);
   });
 
   it('returns 400 when maxUses is reached', async () => {
     await Voucher.create(seedVoucher({ code: 'MAXED', maxUses: 1, usedCount: 1 }));
-    const res = await request(app).post('/api/vouchers/validate').send({ code: 'MAXED' });
+    const res = await request(app).post('/api/vouchers/validate').set('Authorization', `Bearer ${authToken}`).send({ code: 'MAXED' });
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/usage limit/i);
   });
 
   it('returns 400 when subtotal is below minOrderAmount', async () => {
     await Voucher.create(seedVoucher({ code: 'HIGHMIN', minOrderAmount: 50 }));
-    const res = await request(app).post('/api/vouchers/validate').send({ code: 'HIGHMIN', subtotal: 10 });
+    const res = await request(app).post('/api/vouchers/validate').set('Authorization', `Bearer ${authToken}`).send({ code: 'HIGHMIN', subtotal: 10 });
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/Minimum order/i);
   });
 
   it('validates a percentage voucher and returns correct discountAmount', async () => {
     await Voucher.create(seedVoucher({ code: 'PCT20', type: 'percentage', value: 20 }));
-    const res = await request(app).post('/api/vouchers/validate').send({ code: 'PCT20', subtotal: 50 });
+    const res = await request(app).post('/api/vouchers/validate').set('Authorization', `Bearer ${authToken}`).send({ code: 'PCT20', subtotal: 50 });
     expect(res.status).toBe(200);
     expect(res.body.valid).toBe(true);
     expect(res.body.discountAmount).toBe(10); // 20% of 50
@@ -212,7 +217,7 @@ describe('POST /api/vouchers/validate', () => {
 
   it('validates a fixed voucher and caps discount at subtotal', async () => {
     await Voucher.create(seedVoucher({ code: 'FIX100', type: 'fixed', value: 100 }));
-    const res = await request(app).post('/api/vouchers/validate').send({ code: 'FIX100', subtotal: 5 });
+    const res = await request(app).post('/api/vouchers/validate').set('Authorization', `Bearer ${authToken}`).send({ code: 'FIX100', subtotal: 5 });
     expect(res.status).toBe(200);
     expect(res.body.valid).toBe(true);
     expect(res.body.discountAmount).toBe(5); // capped at subtotal
@@ -220,20 +225,14 @@ describe('POST /api/vouchers/validate', () => {
 
   it('is case-insensitive for the code', async () => {
     await Voucher.create(seedVoucher({ code: 'UPPER' }));
-    const res = await request(app).post('/api/vouchers/validate').send({ code: 'upper', subtotal: 20 });
+    const res = await request(app).post('/api/vouchers/validate').set('Authorization', `Bearer ${authToken}`).send({ code: 'upper', subtotal: 20 });
     expect(res.status).toBe(200);
     expect(res.body.valid).toBe(true);
   });
 
-  it('does NOT require authentication', async () => {
-    await Voucher.create(seedVoucher());
-    const res = await request(app).post('/api/vouchers/validate').send({ code: 'TEST10', subtotal: 30 });
-    expect(res.status).toBe(200); // public endpoint
-  });
-
   it('validates when subtotal is 0 and minOrderAmount is 0', async () => {
     await Voucher.create(seedVoucher({ code: 'FREE', type: 'percentage', value: 50, minOrderAmount: 0 }));
-    const res = await request(app).post('/api/vouchers/validate').send({ code: 'FREE', subtotal: 0 });
+    const res = await request(app).post('/api/vouchers/validate').set('Authorization', `Bearer ${authToken}`).send({ code: 'FREE', subtotal: 0 });
     expect(res.status).toBe(200);
     expect(res.body.discountAmount).toBe(0);
   });

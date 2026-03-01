@@ -8,3 +8,8 @@ variable "razorpay_webhook_secret" { sensitive = true }
 variable "email_from" {}
 variable "email_user" {}
 variable "email_pass" { sensitive = true }
+variable "docdb_host" {}
+variable "docdb_port" {}
+variable "docdb_username" {}
+variable "docdb_password" { sensitive = true }
+variable "docdb_database" { default = "farmdirect" }

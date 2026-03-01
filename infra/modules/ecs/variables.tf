@@ -11,7 +11,5 @@ variable "ecr_repository_url" {}
 variable "alb_target_group_arn" {}
 variable "alb_security_group_id" {}
 variable "secrets_arn" {}
-variable "docdb_host" {}
-variable "docdb_port" { type = number }
-variable "docdb_username" {}
 variable "docdb_cluster_resource_id" {}
+variable "docdb_username" {}

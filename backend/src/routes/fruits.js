@@ -5,7 +5,7 @@ const authenticate = require('../middleware/auth');
 
 const router = express.Router();
 
-// Public: list all fruits
+// Public: list all fruits (browsing must work without login)
 router.get('/', async (req, res) => {
   try {
     const { category, search, farmerId } = req.query;
@@ -40,7 +40,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Public: single fruit
+// Public: single fruit detail
 router.get('/:id', async (req, res) => {
   try {
     const fruit = await Fruit.findById(req.params.id).lean();

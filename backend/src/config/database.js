@@ -19,15 +19,22 @@ const connectDB = async () => {
       socketTimeoutMS: 5000,
     };
 
-    // DocumentDB IAM authentication (used on AWS)
-    if (process.env.DOCDB_IAM_AUTH === 'true') {
-      const token = await generateDocDBAuthToken();
+    // DocumentDB connection via credentials from AWS Secrets Manager
+    if (process.env.DOCDB_HOST && process.env.DOCDB_PASSWORD) {
       const host = process.env.DOCDB_HOST;
       const port = process.env.DOCDB_PORT || '27017';
       const dbName = process.env.DOCDB_DATABASE || 'farmdirect';
       const username = encodeURIComponent(process.env.DOCDB_USERNAME);
+      let password;
 
-      uri = `mongodb://${username}:${encodeURIComponent(token)}@${host}:${port}/${dbName}?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false`;
+      // Use IAM auth token if enabled, otherwise use password from Secrets Manager
+      if (process.env.DOCDB_IAM_AUTH === 'true') {
+        password = encodeURIComponent(await generateDocDBAuthToken());
+      } else {
+        password = encodeURIComponent(process.env.DOCDB_PASSWORD);
+      }
+
+      uri = `mongodb://${username}:${password}@${host}:${port}/${dbName}?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false`;
 
       const caPath = process.env.DOCDB_CA_PATH || '/app/rds-combined-ca-bundle.pem';
       options.tls = true;

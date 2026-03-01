@@ -17,5 +17,10 @@ resource "aws_secretsmanager_secret_version" "app_secrets" {
     EMAIL_PASS              = var.email_pass
     EMAIL_HOST              = "smtp.gmail.com"
     EMAIL_PORT              = "587"
+    DOCDB_HOST              = var.docdb_host
+    DOCDB_PORT              = var.docdb_port
+    DOCDB_USERNAME          = var.docdb_username
+    DOCDB_PASSWORD          = var.docdb_password
+    DOCDB_DATABASE          = var.docdb_database
   })
 }

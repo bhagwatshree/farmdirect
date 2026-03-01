@@ -8,7 +8,7 @@ const router = express.Router();
 // Public fields exposed on a farmer profile (never expose password / tokens)
 const PUBLIC_FIELDS = 'role name location phone farmName farmTagline farmStory farmImages farmingPractices certifications establishedYear farmSizeAcres createdAt';
 
-// GET /api/farmers/:id  — public farmer profile
+// GET /api/farmers/:id  — public farmer profile (read-only, safe fields only)
 router.get('/:id', async (req, res) => {
   try {
     const farmer = await User.findById(req.params.id).select(PUBLIC_FIELDS).lean();

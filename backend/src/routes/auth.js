@@ -7,7 +7,7 @@ const User = require('../models/User');
 const { sendEmail } = require('../utils/notifications');
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'farmdirect_secret_key';
+const JWT_SECRET = process.env.JWT_SECRET;
 const MAX_LOGIN_ATTEMPTS = 5;
 
 router.post('/register', async (req, res) => {

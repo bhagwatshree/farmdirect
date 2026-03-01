@@ -5,8 +5,8 @@ const authenticate = require('../middleware/auth');
 
 const router = express.Router();
 
-// Public: validate a voucher code — must be defined BEFORE GET / and POST /
-router.post('/validate', async (req, res) => {
+// Authenticated: validate a voucher code — must be defined BEFORE GET / and POST /
+router.post('/validate', authenticate, async (req, res) => {
   try {
     const { code, subtotal = 0 } = req.body;
 

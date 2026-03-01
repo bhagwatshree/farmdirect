@@ -24,6 +24,11 @@ module "secrets" {
   email_from              = var.email_from
   email_user              = var.email_user
   email_pass              = var.email_pass
+  docdb_host              = module.documentdb.cluster_endpoint
+  docdb_port              = tostring(module.documentdb.cluster_port)
+  docdb_username          = var.docdb_master_username
+  docdb_password          = var.docdb_master_password
+  docdb_database          = "farmdirect"
 }
 
 module "ecs" {
@@ -40,11 +45,9 @@ module "ecs" {
   ecr_repository_url = module.ecr.repository_url
   alb_target_group_arn    = module.alb.target_group_arn
   alb_security_group_id   = module.alb.alb_security_group_id
-  secrets_arn             = module.secrets.secret_arn
-  docdb_host              = module.documentdb.cluster_endpoint
-  docdb_port              = module.documentdb.cluster_port
-  docdb_username          = var.docdb_master_username
+  secrets_arn               = module.secrets.secret_arn
   docdb_cluster_resource_id = module.documentdb.cluster_resource_id
+  docdb_username            = var.docdb_master_username
 }
 
 module "documentdb" {

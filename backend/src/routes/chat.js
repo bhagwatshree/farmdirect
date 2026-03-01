@@ -5,13 +5,14 @@ const OpenAI = require('openai');
 const Fruit = require('../models/Fruit');
 const User = require('../models/User');
 const { sendEmail } = require('../utils/notifications');
+const authenticate = require('../middleware/auth');
 
 const router = express.Router();
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const JWT_SECRET = process.env.JWT_SECRET || 'farmdirect_secret_key';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // POST /api/chat/send-otp — send 6-digit OTP to user's email
-router.post('/send-otp', async (req, res) => {
+router.post('/send-otp', authenticate, async (req, res) => {
   try {
     const email = req.body.email?.toLowerCase().trim();
     if (!email) return res.status(400).json({ message: 'Email required' });
@@ -45,7 +46,7 @@ router.post('/send-otp', async (req, res) => {
 });
 
 // POST /api/chat/verify-otp — verify OTP and return session token
-router.post('/verify-otp', async (req, res) => {
+router.post('/verify-otp', authenticate, async (req, res) => {
   try {
     const email = req.body.email?.toLowerCase().trim();
     const { otp } = req.body;
@@ -77,7 +78,7 @@ router.post('/verify-otp', async (req, res) => {
 });
 
 // POST /api/chat — main chat endpoint
-router.post('/', async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
   try {
     const { message, history = [], sessionToken } = req.body;
     if (!message) return res.status(400).json({ message: 'Message is required' });
