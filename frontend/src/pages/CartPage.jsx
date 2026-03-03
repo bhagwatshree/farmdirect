@@ -446,6 +446,11 @@ export default function CartPage() {
             </Box>
           </>
         )}
+        {shippingPayment === 'online' && (shippingFee > 0 || transportTotal > 0) && (
+          <Typography variant="caption" color="success.main" display="block" mt={0.5} textAlign="center">
+            Shipping & transport ({formatINR(shippingFee + transportTotal)}) included in payment
+          </Typography>
+        )}
       </Paper>
 
       <Button

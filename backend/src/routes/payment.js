@@ -7,6 +7,7 @@ const Fruit = require('../models/Fruit');
 const Voucher = require('../models/Voucher');
 const authenticate = require('../middleware/auth');
 const { notifyOrderCreated } = require('../utils/notifications');
+const { getCartWeightKg, getShippingFee } = require('../utils/shipping');
 
 const router = express.Router();
 
@@ -43,7 +44,7 @@ router.post('/create-order', authenticate, async (req, res) => {
       return res.status(403).json({ message: 'Customers only' });
     }
 
-    const { items, billingAddress, deliveryAddress, voucherCode, shippingPayment, shippingFee: clientShippingFee } = req.body;
+    const { items, billingAddress, deliveryAddress, voucherCode, shippingPayment } = req.body;
     if (!items || items.length === 0) {
       return res.status(400).json({ message: 'No items in order' });
     }
@@ -98,7 +99,10 @@ router.post('/create-order', authenticate, async (req, res) => {
     }
 
     const { discountAmount = 0, voucher } = voucherResult;
-    const shippingFee = parseFloat((clientShippingFee || 0).toFixed(2));
+
+    // Compute shipping fee server-side from actual item weights (don't trust client)
+    const totalWeightKg = getCartWeightKg(orderItems);
+    const shippingFee = orderItems.length > 0 ? getShippingFee(totalWeightKg) : 0;
     const shippingCosts = parseFloat((shippingFee + transportCost).toFixed(2));
     const total = parseFloat(Math.max(0, subtotal + shippingCosts - discountAmount).toFixed(2));
 

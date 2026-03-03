@@ -114,7 +114,8 @@ describe('POST /api/orders', () => {
       .set('Authorization', `Bearer ${customerToken}`)
       .send({ items: [{ fruitId: 'test-fruit', quantity: 5 }] });
     expect(res.status).toBe(201);
-    expect(res.body.total).toBe(10);
+    expect(res.body.shippingFee).toBe(30);
+    expect(res.body.total).toBe(40); // subtotal 10 + shipping 30
     expect(res.body.status).toBe('pending');
     expect(res.body.customerId).toBe('cust-1');
     const updatedFruit = await Fruit.findById('test-fruit');
@@ -152,7 +153,8 @@ describe('POST /api/orders', () => {
     expect(res.status).toBe(201);
     expect(res.body.subtotal).toBe(8);
     expect(res.body.transportCost).toBe(6);
-    expect(res.body.total).toBe(14);
+    expect(res.body.shippingFee).toBe(30);
+    expect(res.body.total).toBe(44); // subtotal 8 + transport 6 + shipping 30
   });
 
   it('applies a percentage voucher and deducts discount from total', async () => {
@@ -164,7 +166,8 @@ describe('POST /api/orders', () => {
     expect(res.status).toBe(201);
     expect(res.body.subtotal).toBe(10);
     expect(res.body.discountAmount).toBe(1);
-    expect(res.body.total).toBe(9);
+    expect(res.body.shippingFee).toBe(30);
+    expect(res.body.total).toBe(39); // subtotal 10 + shipping 30 - discount 1
     expect(res.body.voucherCode).toBe('SAVE10');
     const v = await Voucher.findById('v1');
     expect(v.usedCount).toBe(1);
@@ -178,7 +181,8 @@ describe('POST /api/orders', () => {
       .send({ items: [{ fruitId: 'test-fruit', quantity: 5 }], voucherCode: 'FLAT3' });
     expect(res.status).toBe(201);
     expect(res.body.discountAmount).toBe(3);
-    expect(res.body.total).toBe(7);
+    expect(res.body.shippingFee).toBe(30);
+    expect(res.body.total).toBe(37); // subtotal 10 + shipping 30 - discount 3
   });
 
   it('returns 400 when voucher code is invalid', async () => {
@@ -241,7 +245,8 @@ describe('POST /api/orders', () => {
     expect(res.body.subtotal).toBe(4);
     expect(res.body.transportCost).toBe(4);
     expect(res.body.discountAmount).toBe(0.4);
-    expect(res.body.total).toBe(7.6);
+    expect(res.body.shippingFee).toBe(30);
+    expect(res.body.total).toBe(37.6); // subtotal 4 + transport 4 + shipping 30 - discount 0.4
   });
 });
 
