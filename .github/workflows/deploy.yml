@@ -1,8 +1,16 @@
 name: Deploy to AWS
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+          - staging
 
 env:
   AWS_REGION: ap-south-1
