@@ -8,10 +8,16 @@ const authenticate = require('../middleware/auth');
 const { notifyOrderCreated, notifyStatusChanged } = require('../utils/notifications');
 const { getCartWeightKg, getShippingFee } = require('../utils/shipping');
 
-const razorpay = new Razorpay({
-  key_id:     process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+let razorpay;
+function getRazorpay() {
+  if (!razorpay) {
+    razorpay = new Razorpay({
+      key_id:     process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
+  return razorpay;
+}
 
 const router = express.Router();
 
@@ -288,7 +294,7 @@ router.put('/:id/cancel', authenticate, async (req, res) => {
     const refundableStatuses = ['payment_complete', 'pending', 'confirmed', 'accepted'];
     if (refundableStatuses.includes(order.status) && order.razorpayPaymentId) {
       try {
-        const refund = await razorpay.payments.refund(order.razorpayPaymentId, {
+        const refund = await getRazorpay().payments.refund(order.razorpayPaymentId, {
           amount: Math.round(order.total * 100),
           notes: { reason: 'Customer cancellation' },
         });
