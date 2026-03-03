@@ -32,40 +32,34 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            parallel {
-                stage('Backend Deps') {
-                    steps {
-                        dir('backend') {
-                            bat 'D:\\Node\\npm.cmd ci'
-                        }
-                    }
-                }
-                stage('Frontend Deps') {
-                    steps {
-                        dir('frontend') {
-                            bat 'D:\\Node\\npm.cmd ci'
-                        }
-                    }
+        stage('Install Backend Deps') {
+            steps {
+                dir('backend') {
+                    bat 'D:\\Node\\npm.cmd ci'
                 }
             }
         }
 
-        stage('Test') {
-            parallel {
-                stage('Backend Tests') {
-                    steps {
-                        dir('backend') {
-                            bat 'D:\\Node\\npm.cmd test -- --forceExit --detectOpenHandles'
-                        }
-                    }
+        stage('Install Frontend Deps') {
+            steps {
+                dir('frontend') {
+                    bat 'D:\\Node\\npm.cmd ci'
                 }
-                stage('Frontend Build') {
-                    steps {
-                        dir('frontend') {
-                            bat 'set CI=true && D:\\Node\\npm.cmd run build'
-                        }
-                    }
+            }
+        }
+
+        stage('Backend Tests') {
+            steps {
+                dir('backend') {
+                    bat 'D:\\Node\\npm.cmd test -- --forceExit --detectOpenHandles'
+                }
+            }
+        }
+
+        stage('Frontend Build') {
+            steps {
+                dir('frontend') {
+                    bat 'set CI=true && D:\\Node\\npm.cmd run build'
                 }
             }
         }
