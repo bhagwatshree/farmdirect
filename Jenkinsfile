@@ -37,14 +37,14 @@ pipeline {
                 stage('Backend Deps') {
                     steps {
                         dir('backend') {
-                            bat 'npm ci'
+                            bat 'D:\\Node\\npm.cmd ci'
                         }
                     }
                 }
                 stage('Frontend Deps') {
                     steps {
                         dir('frontend') {
-                            bat 'npm ci'
+                            bat 'D:\\Node\\npm.cmd ci'
                         }
                     }
                 }
@@ -56,14 +56,14 @@ pipeline {
                 stage('Backend Tests') {
                     steps {
                         dir('backend') {
-                            bat 'npm test -- --forceExit --detectOpenHandles'
+                            bat 'D:\\Node\\npm.cmd test -- --forceExit --detectOpenHandles'
                         }
                     }
                 }
                 stage('Frontend Build') {
                     steps {
                         dir('frontend') {
-                            bat 'set CI=true && npm run build'
+                            bat 'set CI=true && D:\\Node\\npm.cmd run build'
                         }
                     }
                 }
