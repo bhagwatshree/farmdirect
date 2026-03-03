@@ -30,6 +30,6 @@ echo Starting Jenkins on port 8080 ...
 echo Press Ctrl+C to stop.
 echo.
 
-"%JAVA_HOME%\bin\java.exe" -jar "%~dp0jenkins.war" --httpPort=8080
+"%JAVA_HOME%\bin\java.exe" -Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true -jar "%~dp0jenkins.war" --httpPort=8080
 
 endlocal

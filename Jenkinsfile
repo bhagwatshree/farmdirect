@@ -23,6 +23,8 @@ pipeline {
 
         stage('Checkout') {
             steps {
+                bat 'taskkill /F /IM node.exe 2>NUL || exit /b 0'
+                cleanWs()
                 checkout scm
                 script {
                     env.GIT_SHORT_COMMIT = bat(script: '@git rev-parse --short HEAD', returnStdout: true).trim()
@@ -66,6 +68,9 @@ pipeline {
     }
 
     post {
+        always {
+            bat 'taskkill /F /IM node.exe 2>NUL || exit /b 0'
+        }
         success {
             echo "CI PASSED for commit ${env.GIT_SHORT_COMMIT}"
         }
