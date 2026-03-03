@@ -14,7 +14,7 @@ pipeline {
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '20'))
-        timeout(time: 20, unit: 'MINUTES')
+        timeout(time: 40, unit: 'MINUTES')
         disableConcurrentBuilds()
         timestamps()
     }
@@ -24,7 +24,6 @@ pipeline {
         stage('Checkout') {
             steps {
                 bat 'taskkill /F /IM node.exe 2>NUL || exit /b 0'
-                cleanWs()
                 checkout scm
                 script {
                     env.GIT_SHORT_COMMIT = bat(script: '@git rev-parse --short HEAD', returnStdout: true).trim()
@@ -37,7 +36,7 @@ pipeline {
         stage('Install Backend Deps') {
             steps {
                 dir('backend') {
-                    bat 'D:\\Node\\npm.cmd ci'
+                    bat 'D:\\Node\\npm.cmd install'
                 }
             }
         }
@@ -45,7 +44,7 @@ pipeline {
         stage('Install Frontend Deps') {
             steps {
                 dir('frontend') {
-                    bat 'D:\\Node\\npm.cmd ci'
+                    bat 'D:\\Node\\npm.cmd install'
                 }
             }
         }
