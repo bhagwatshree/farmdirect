@@ -11,10 +11,16 @@ const { getCartWeightKg, getShippingFee } = require('../utils/shipping');
 
 const router = express.Router();
 
-const razorpay = new Razorpay({
-  key_id:     process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+let razorpay;
+function getRazorpay() {
+  if (!razorpay) {
+    razorpay = new Razorpay({
+      key_id:     process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
+  return razorpay;
+}
 
 // Helper: validate voucher (mirrors orders.js)
 async function validateVoucher(code, subtotal) {
@@ -112,7 +118,7 @@ router.post('/create-order', authenticate, async (req, res) => {
     const onlineAmount = parseFloat(Math.max(0, total - codAmount).toFixed(2));
 
     // Create Razorpay order (amount in paise — only the online portion)
-    const rzpOrder = await razorpay.orders.create({
+    const rzpOrder = await getRazorpay().orders.create({
       amount: Math.round(onlineAmount * 100), // paise
       currency: 'INR',
       receipt: uuidv4(),

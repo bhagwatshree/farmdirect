@@ -9,10 +9,16 @@ const router = express.Router();
 
 const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
 
-const razorpay = new Razorpay({
-  key_id:     process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+let razorpay;
+function getRazorpay() {
+  if (!razorpay) {
+    razorpay = new Razorpay({
+      key_id:     process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
+  return razorpay;
+}
 
 // Verify Razorpay webhook signature
 function verifyWebhookSignature(rawBody, signature) {
@@ -86,7 +92,7 @@ router.post('/razorpay', express.raw({ type: 'application/json' }), async (req, 
 
           // Auto-capture the payment
           try {
-            await razorpay.payments.capture(payment.id, payment.amount, payment.currency);
+            await getRazorpay().payments.capture(payment.id, payment.amount, payment.currency);
             console.log(`[Webhook] Auto-captured payment ${payment.id}`);
           } catch (captureErr) {
             console.error(`[Webhook] Auto-capture failed for ${payment.id}:`, captureErr.message);
