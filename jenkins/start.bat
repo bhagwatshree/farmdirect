@@ -6,7 +6,7 @@ REM ============================================================================
 
 setlocal
 
-set JAVA_HOME=C:\Program Files\Java\jdk-11.0.3
+set JAVA_HOME=%~dp0tools\jdk-17
 set JENKINS_HOME=%~dp0home
 set PATH=%JAVA_HOME%\bin;D:\Node;%~dp0tools;%PATH%
 

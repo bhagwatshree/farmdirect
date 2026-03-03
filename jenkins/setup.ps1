@@ -9,14 +9,13 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Write-Host "`n=== FarmDirect Local CI/CD Setup ===" -ForegroundColor Cyan
 
 # ─── 1. Download Jenkins WAR ─────────────────────────────────────────────────
-$JenkinsVersion = "2.462.3"
-$JenkinsWar     = Join-Path $ScriptDir "jenkins.war"
+$JenkinsWar = Join-Path $ScriptDir "jenkins.war"
 
 if (Test-Path $JenkinsWar) {
     Write-Host "[OK] Jenkins WAR already downloaded." -ForegroundColor Green
 } else {
-    Write-Host "[1/3] Downloading Jenkins LTS $JenkinsVersion ..." -ForegroundColor Yellow
-    $JenkinsUrl = "https://get.jenkins.io/war-stable/$JenkinsVersion/jenkins.war"
+    Write-Host "[1/4] Downloading Jenkins LTS (latest) ..." -ForegroundColor Yellow
+    $JenkinsUrl = "https://get.jenkins.io/war-stable/latest/jenkins.war"
     Invoke-WebRequest -Uri $JenkinsUrl -OutFile $JenkinsWar -UseBasicParsing
     Write-Host "[OK] Jenkins WAR downloaded to $JenkinsWar" -ForegroundColor Green
 }
@@ -39,7 +38,28 @@ if (Test-Path $TerraformExe) {
     Write-Host "[OK] Terraform extracted to $TerraformExe" -ForegroundColor Green
 }
 
-# ─── 3. Create Jenkins home directory ────────────────────────────────────────
+# ─── 3. Download JDK 17 (Eclipse Temurin) ────────────────────────────────────
+$JdkDir = Join-Path $ToolsDir "jdk-17"
+$JdkJava = Join-Path $JdkDir "bin\java.exe"
+
+if (Test-Path $JdkJava) {
+    Write-Host "[OK] JDK 17 already downloaded." -ForegroundColor Green
+} else {
+    Write-Host "[3/4] Downloading Eclipse Temurin JDK 17 ..." -ForegroundColor Yellow
+    $JdkZip = Join-Path $ToolsDir "jdk17.zip"
+    $TempDir = Join-Path $ToolsDir "jdk17-temp"
+    $JdkUrl = "https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jdk/hotspot/normal/eclipse?project=jdk"
+    Invoke-WebRequest -Uri $JdkUrl -OutFile $JdkZip -UseBasicParsing
+    Expand-Archive -Path $JdkZip -DestinationPath $TempDir -Force
+    $extracted = Get-ChildItem $TempDir | Select-Object -First 1
+    if (Test-Path $JdkDir) { Remove-Item $JdkDir -Recurse -Force }
+    Move-Item $extracted.FullName $JdkDir
+    Remove-Item $TempDir -Recurse -Force
+    Remove-Item $JdkZip -Force
+    Write-Host "[OK] JDK 17 installed at $JdkDir" -ForegroundColor Green
+}
+
+# ─── 4. Create Jenkins home directory ────────────────────────────────────────
 $JenkinsHome = Join-Path $ScriptDir "home"
 if (!(Test-Path $JenkinsHome)) {
     New-Item -ItemType Directory -Force -Path $JenkinsHome | Out-Null
@@ -47,7 +67,7 @@ if (!(Test-Path $JenkinsHome)) {
 }
 
 # ─── 4. Docker Desktop check ────────────────────────────────────────────────
-Write-Host "`n[3/3] Checking Docker Desktop ..." -ForegroundColor Yellow
+Write-Host "`n[4/4] Checking Docker Desktop ..." -ForegroundColor Yellow
 $DockerPath = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
 if (Test-Path $DockerPath) {
     Write-Host "[OK] Docker Desktop found." -ForegroundColor Green
@@ -69,6 +89,7 @@ Write-Host @"
 
   Tools installed:
     Jenkins WAR : $JenkinsWar
+    JDK 17      : $JdkDir
     Terraform   : $TerraformExe
     Jenkins Home: $JenkinsHome
 
