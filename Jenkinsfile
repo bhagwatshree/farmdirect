@@ -4,6 +4,10 @@
 pipeline {
     agent any
 
+    environment {
+        PATH = "D:\\Node;${env.PATH}"
+    }
+
     triggers {
         pollSCM('H/2 * * * *')  // Poll GitHub every 2 minutes for new commits
     }
