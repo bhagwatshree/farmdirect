@@ -36,7 +36,7 @@ pipeline {
         stage('Install Backend Deps') {
             steps {
                 dir('backend') {
-                    bat 'D:\\Node\\npm.cmd install'
+                    bat 'D:\\Node\\npm.cmd ci'
                 }
             }
         }
@@ -44,7 +44,7 @@ pipeline {
         stage('Install Frontend Deps') {
             steps {
                 dir('frontend') {
-                    bat 'D:\\Node\\npm.cmd install'
+                    bat 'D:\\Node\\npm.cmd ci'
                 }
             }
         }
