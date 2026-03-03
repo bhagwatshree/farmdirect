@@ -35,3 +35,8 @@ infra/.terraform/
 infra/*.tfstate*
 infra/terraform.tfvars
 infra/.terraform.lock.hcl
+
+# Jenkins
+jenkins/home/
+jenkins/*.war
+jenkins/tools/

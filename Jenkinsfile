@@ -2,16 +2,17 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION         = 'ap-south-1'
-        ECR_REPOSITORY     = 'farmdirect-prod'
-        ECS_CLUSTER        = 'farmdirect-prod'
-        ECS_SERVICE        = 'farmdirect-prod-service'
-        DOCKER_IMAGE_TAG   = "${env.BUILD_NUMBER}-${env.GIT_COMMIT?.take(7) ?: 'unknown'}"
+        AWS_REGION       = 'ap-south-1'
+        AWS_ACCOUNT_ID   = '405114130882'
+        ECR_REPOSITORY   = 'farmdirect-prod'
+        ECS_CLUSTER      = 'farmdirect-prod'
+        ECS_SERVICE      = 'farmdirect-prod-service'
+        ECR_REGISTRY     = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
     }
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '20'))
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 45, unit: 'MINUTES')
         disableConcurrentBuilds()
         timestamps()
     }
@@ -25,47 +26,81 @@ pipeline {
         booleanParam(
             name: 'SKIP_TESTS',
             defaultValue: false,
-            description: 'Skip running tests (use with caution)'
+            description: 'Skip test stage (use with caution)'
         )
         booleanParam(
-            name: 'FORCE_DEPLOY',
+            name: 'PROVISION_INFRA',
             defaultValue: false,
-            description: 'Force deployment even if no code changes detected'
+            description: 'Run Terraform to provision/update AWS infrastructure (first-time or infra changes)'
         )
     }
 
     stages {
+
+        // ── Checkout ────────────────────────────────────────────────────
         stage('Checkout') {
             steps {
                 checkout scm
                 script {
-                    env.GIT_SHORT_COMMIT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    env.GIT_COMMIT_MSG   = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
-                    echo "Building commit: ${env.GIT_SHORT_COMMIT} - ${env.GIT_COMMIT_MSG}"
+                    env.GIT_SHORT_COMMIT = bat(script: '@git rev-parse --short HEAD', returnStdout: true).trim()
+                    env.DOCKER_IMAGE_TAG = "${BUILD_NUMBER}-${env.GIT_SHORT_COMMIT}"
+                    echo "Building commit: ${env.GIT_SHORT_COMMIT} | Image tag: ${env.DOCKER_IMAGE_TAG}"
                 }
             }
         }
 
+        // ── Provision Infrastructure (Terraform) ────────────────────────
+        stage('Provision Infrastructure') {
+            when {
+                expression { return params.PROVISION_INFRA }
+            }
+            steps {
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID',     variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    dir('infra') {
+                        bat """
+                            set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
+                            set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+                            set AWS_DEFAULT_REGION=${AWS_REGION}
+                            terraform init
+                            terraform plan -out=tfplan
+                        """
+                        input message: 'Review the Terraform plan above. Approve to apply?', ok: 'Apply'
+                        bat """
+                            set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
+                            set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+                            set AWS_DEFAULT_REGION=${AWS_REGION}
+                            terraform apply -auto-approve tfplan
+                        """
+                    }
+                }
+            }
+        }
+
+        // ── Install Dependencies ────────────────────────────────────────
         stage('Install Dependencies') {
             parallel {
-                stage('Backend Dependencies') {
+                stage('Backend Deps') {
                     steps {
                         dir('backend') {
-                            sh 'npm ci'
+                            bat 'npm ci'
                         }
                     }
                 }
-                stage('Frontend Dependencies') {
+                stage('Frontend Deps') {
                     steps {
                         dir('frontend') {
-                            sh 'npm ci'
+                            bat 'npm ci'
                         }
                     }
                 }
             }
         }
 
-        stage('Lint & Test') {
+        // ── Test ────────────────────────────────────────────────────────
+        stage('Test') {
             when {
                 expression { return !params.SKIP_TESTS }
             }
@@ -73,87 +108,95 @@ pipeline {
                 stage('Backend Tests') {
                     steps {
                         dir('backend') {
-                            sh 'npm test -- --forceExit --detectOpenHandles'
-                        }
-                    }
-                    post {
-                        always {
-                            junit(testResults: 'backend/junit.xml', allowEmptyResults: true)
+                            bat 'npm test -- --forceExit --detectOpenHandles'
                         }
                     }
                 }
                 stage('Frontend Build Check') {
                     steps {
                         dir('frontend') {
-                            sh 'CI=true npm run build'
+                            bat 'set CI=true && npm run build'
                         }
                     }
                 }
             }
         }
 
+        // ── Docker Build ────────────────────────────────────────────────
         stage('Docker Build') {
             steps {
-                script {
-                    def ecrRegistry = sh(
-                        script: "aws ecr describe-repositories --repository-names ${ECR_REPOSITORY} --region ${AWS_REGION} --query 'repositories[0].repositoryUri' --output text | sed 's|/.*||'",
-                        returnStdout: true
-                    ).trim()
-                    env.ECR_REGISTRY = ecrRegistry
-
-                    sh """
-                        docker build \
-                            -t ${env.ECR_REGISTRY}/${ECR_REPOSITORY}:${DOCKER_IMAGE_TAG} \
-                            -t ${env.ECR_REGISTRY}/${ECR_REPOSITORY}:latest \
-                            .
-                    """
-                }
+                bat """
+                    docker build ^
+                        -t ${ECR_REGISTRY}/${ECR_REPOSITORY}:${env.DOCKER_IMAGE_TAG} ^
+                        -t ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest ^
+                        .
+                """
             }
         }
 
+        // ── Push to ECR ─────────────────────────────────────────────────
         stage('Push to ECR') {
             steps {
-                script {
-                    sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${env.ECR_REGISTRY}"
-                    sh "docker push ${env.ECR_REGISTRY}/${ECR_REPOSITORY}:${DOCKER_IMAGE_TAG}"
-                    sh "docker push ${env.ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID',     variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    bat """
+                        set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
+                        set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+                        set AWS_DEFAULT_REGION=${AWS_REGION}
+                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                    """
+                    bat "docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:${env.DOCKER_IMAGE_TAG}"
+                    bat "docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
                 }
             }
         }
 
+        // ── Deploy to ECS ───────────────────────────────────────────────
         stage('Deploy to ECS') {
             steps {
-                script {
-                    def cluster = (params.ENVIRONMENT == 'staging') ? 'farmdirect-staging' : ECS_CLUSTER
-                    def service = (params.ENVIRONMENT == 'staging') ? 'farmdirect-staging-service' : ECS_SERVICE
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID',     variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    script {
+                        def cluster = (params.ENVIRONMENT == 'staging') ? 'farmdirect-staging' : ECS_CLUSTER
+                        def service = (params.ENVIRONMENT == 'staging') ? 'farmdirect-staging-service' : ECS_SERVICE
 
-                    echo "Deploying ${DOCKER_IMAGE_TAG} to ${params.ENVIRONMENT} (${cluster}/${service})"
+                        echo "Deploying ${env.DOCKER_IMAGE_TAG} to ${params.ENVIRONMENT}"
 
-                    sh """
-                        aws ecs update-service \
-                            --cluster ${cluster} \
-                            --service ${service} \
-                            --force-new-deployment \
-                            --region ${AWS_REGION}
-                    """
+                        bat """
+                            set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
+                            set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+                            set AWS_DEFAULT_REGION=${AWS_REGION}
+                            aws ecs update-service --cluster ${cluster} --service ${service} --force-new-deployment --region ${AWS_REGION}
+                        """
+                    }
                 }
             }
         }
 
+        // ── Verify Deployment ───────────────────────────────────────────
         stage('Verify Deployment') {
             steps {
-                script {
-                    def cluster = (params.ENVIRONMENT == 'staging') ? 'farmdirect-staging' : ECS_CLUSTER
-                    def service = (params.ENVIRONMENT == 'staging') ? 'farmdirect-staging-service' : ECS_SERVICE
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID',     variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    script {
+                        def cluster = (params.ENVIRONMENT == 'staging') ? 'farmdirect-staging' : ECS_CLUSTER
+                        def service = (params.ENVIRONMENT == 'staging') ? 'farmdirect-staging-service' : ECS_SERVICE
 
-                    echo "Waiting for ECS service to stabilize..."
-                    sh """
-                        aws ecs wait services-stable \
-                            --cluster ${cluster} \
-                            --services ${service} \
-                            --region ${AWS_REGION}
-                    """
-                    echo "Deployment verified — service is stable."
+                        echo "Waiting for ECS service to stabilize..."
+                        bat """
+                            set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
+                            set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+                            set AWS_DEFAULT_REGION=${AWS_REGION}
+                            aws ecs wait services-stable --cluster ${cluster} --services ${service} --region ${AWS_REGION}
+                        """
+                        echo "Deployment verified — service is stable."
+                    }
                 }
             }
         }
@@ -161,15 +204,14 @@ pipeline {
 
     post {
         success {
-            echo "Release ${DOCKER_IMAGE_TAG} deployed to ${params.ENVIRONMENT} successfully."
+            echo "Release ${env.DOCKER_IMAGE_TAG} deployed to ${params.ENVIRONMENT} successfully."
         }
         failure {
-            echo "Release failed for commit ${env.GIT_SHORT_COMMIT}. Check logs above."
+            echo "Release failed. Check stage logs above for details."
         }
         cleanup {
-            sh "docker rmi ${env.ECR_REGISTRY}/${ECR_REPOSITORY}:${DOCKER_IMAGE_TAG} || true"
-            sh "docker rmi ${env.ECR_REGISTRY}/${ECR_REPOSITORY}:latest || true"
-            cleanWs()
+            bat "docker rmi ${ECR_REGISTRY}/${ECR_REPOSITORY}:${env.DOCKER_IMAGE_TAG} 2>nul || echo cleanup done"
+            bat "docker rmi ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest 2>nul || echo cleanup done"
         }
     }
 }
