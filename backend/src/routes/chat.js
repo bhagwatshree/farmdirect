@@ -8,7 +8,13 @@ const { sendEmail } = require('../utils/notifications');
 const authenticate = require('../middleware/auth');
 
 const router = express.Router();
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let client;
+function getOpenAI() {
+  if (!client) {
+    client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return client;
+}
 const JWT_SECRET = process.env.JWT_SECRET;
 
 // POST /api/chat/send-otp — send 6-digit OTP to user's email
@@ -190,7 +196,7 @@ Guidelines:
       reqParams.tool_choice = 'auto';
     }
 
-    const response = await client.chat.completions.create(reqParams);
+    const response = await getOpenAI().chat.completions.create(reqParams);
     let reply, requiresAuth = false;
 
     if (response.choices[0].finish_reason === 'tool_calls') {
@@ -252,7 +258,7 @@ Guidelines:
       }
 
       // Follow-up call with tool result
-      const followUp = await client.chat.completions.create({
+      const followUp = await getOpenAI().chat.completions.create({
         model: 'gpt-4o-mini',
         max_tokens: 300,
         messages: [
