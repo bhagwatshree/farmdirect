@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import {
   Container, Box, Typography, Paper, Divider, Button, Chip, CircularProgress,
 } from '@mui/material';
-import { CheckCircle, Receipt, Home, ShoppingBag } from '@mui/icons-material';
+import { CheckCircle, Receipt, ShoppingBag } from '@mui/icons-material';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { getCategoryEmoji, formatINR, formatOrderId, STATUS_LABELS, STATUS_COLORS } from '../utils/constants';
+import { pushEvent } from '../utils/gtm';
 
 export default function OrderConfirmationPage() {
   const { id } = useParams();
@@ -22,6 +23,23 @@ export default function OrderConfirmationPage() {
         .finally(() => setLoading(false));
     }
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (order) {
+      pushEvent('purchase', {
+        ecommerce: {
+          transaction_id: order._id,
+          value: order.total,
+          currency: 'INR',
+          shipping: (order.shippingFee || 0) + (order.transportCost || 0),
+          items: order.items.map(i => ({
+            item_id: i.fruitId, item_name: i.fruitName, item_category: i.category,
+            price: i.pricePerUnit, quantity: i.quantity,
+          })),
+        },
+      });
+    }
+  }, [order?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <Box display="flex" justifyContent="center" py={10}><CircularProgress /></Box>;
   if (!order) return null;
