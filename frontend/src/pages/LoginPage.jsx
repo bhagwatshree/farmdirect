@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { pushEvent } from '../utils/gtm';
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -24,6 +25,7 @@ export default function LoginPage() {
     try {
       const res = await api.post('/auth/login', form);
       login(res.data.user, res.data.token);
+      pushEvent('login', { method: 'email' });
       navigate(res.data.user.role === 'farmer' ? '/farmer' : '/');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');

@@ -12,6 +12,7 @@ import { useCart } from '../context/CartContext';
 import ImageCarousel from '../components/ImageCarousel';
 import FruitCard from '../components/FruitCard';
 import { formatINR } from '../utils/constants';
+import { pushEvent } from '../utils/gtm';
 
 // ── Video helpers ─────────────────────────────────────────────────────────────
 function getYouTubeId(url) {
@@ -86,6 +87,11 @@ export default function ProductDetailPage() {
     api.get(`/fruits/${id}`)
       .then(res => {
         setFruit(res.data);
+        pushEvent('view_item', {
+          ecommerce: {
+            items: [{ item_id: res.data.id, item_name: res.data.name, item_category: res.data.category, price: res.data.price }],
+          },
+        });
         // Fetch similar products from same category
         api.get('/fruits', { params: { category: res.data.category } })
           .then(r => setSimilar(r.data.filter(f => f.id !== res.data.id).slice(0, 6)))

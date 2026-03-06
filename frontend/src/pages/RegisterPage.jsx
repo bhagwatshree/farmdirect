@@ -7,6 +7,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { pushEvent } from '../utils/gtm';
 
 const EMPTY_ADDRESS = { street: '', city: '', state: '', postalCode: '', country: '' };
 
@@ -72,6 +73,7 @@ export default function RegisterPage() {
       }
       const res = await api.post('/auth/register', payload);
       login(res.data.user, res.data.token);
+      pushEvent('sign_up', { method: 'email' });
       navigate(form.role === 'farmer' ? '/farmer' : '/listings');
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');

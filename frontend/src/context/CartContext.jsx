@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext } from 'react';
 import { getCartWeightKg, getShippingFee, MAX_ORDER_KG } from '../utils/constants';
+import { pushEvent } from '../utils/gtm';
 
 const CartContext = createContext(null);
 
@@ -16,11 +17,28 @@ export function CartProvider({ children }) {
         : [...prev, { ...fruit, qty }];
       // Enforce max 100 kg
       if (getCartWeightKg(updated) > MAX_ORDER_KG) return prev;
+      pushEvent('add_to_cart', {
+        ecommerce: {
+          items: [{ item_id: fruit.id, item_name: fruit.name, item_category: fruit.category, price: fruit.price, quantity: qty }],
+        },
+      });
       return updated;
     });
   };
 
-  const removeItem = (id) => setItems(prev => prev.filter(i => i.id !== id));
+  const removeItem = (id) => {
+    setItems(prev => {
+      const item = prev.find(i => i.id === id);
+      if (item) {
+        pushEvent('remove_from_cart', {
+          ecommerce: {
+            items: [{ item_id: item.id, item_name: item.name, item_category: item.category, price: item.price, quantity: item.qty }],
+          },
+        });
+      }
+      return prev.filter(i => i.id !== id);
+    });
+  };
 
   const updateQty = (id, qty) => {
     if (qty <= 0) return removeItem(id);

@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { useCart } from '../context/CartContext';
 import api from '../api/axios';
 import { getCategoryEmoji, formatINR, getShippingTierLabel, TRANSPORT_TIERS } from '../utils/constants';
+import { pushEvent } from '../utils/gtm';
 
 const EMPTY_ADDRESS = { street: '', city: '', state: '', postalCode: '', country: '' };
 
@@ -179,6 +180,14 @@ export default function CartPage() {
       setSnack({ open: true, msg: 'Please fill in all required delivery address fields.', severity: 'error' });
       return;
     }
+
+    pushEvent('begin_checkout', {
+      ecommerce: {
+        value: discountedTotal,
+        currency: 'INR',
+        items: items.map(i => ({ item_id: i.id, item_name: i.name, item_category: i.category, price: i.price, quantity: i.qty })),
+      },
+    });
 
     setLoading(true);
     try {

@@ -20,6 +20,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import ChatBot from './components/ChatBot';
 import CartDrawer from './components/CartDrawer';
 import CartBottomBar from './components/CartBottomBar';
+import GTMPageTracker from './components/GTMPageTracker';
 
 const theme = createTheme({
   palette: {
@@ -52,6 +53,7 @@ export default function App() {
       <AuthProvider>
         <CartProvider>
           <BrowserRouter>
+            <GTMPageTracker />
             <Navbar />
             <CartDrawer />
             {/* Extra bottom padding on mobile so content isn't hidden by CartBottomBar */}
