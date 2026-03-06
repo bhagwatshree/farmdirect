@@ -33,6 +33,12 @@ pipeline {
             }
         }
 
+        stage('Load Environment') {
+            steps {
+                bat 'copy /Y D:\\Claude\\Test_Project\\backend\\.env backend\\.env'
+            }
+        }
+
         stage('Install Backend Deps') {
             steps {
                 dir('backend') {
