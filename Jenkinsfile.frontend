@@ -1,5 +1,5 @@
 // =============================================================================
-// FarmDirect CI Pipeline — Runs on every commit (build + test)
+// FarmDirect Frontend CI Pipeline — Install deps + production build
 // =============================================================================
 pipeline {
     agent any
@@ -9,7 +9,7 @@ pipeline {
     }
 
     triggers {
-        pollSCM('H/10 * * * *')  // Poll GitHub every 2 minutes for new commits
+        pollSCM('H/10 * * * *')
     }
 
     options {
@@ -33,26 +33,10 @@ pipeline {
             }
         }
 
-        stage('Install Backend Deps') {
-            steps {
-                dir('backend') {
-                    bat 'D:\\Node\\npm.cmd ci'
-                }
-            }
-        }
-
         stage('Install Frontend Deps') {
             steps {
                 dir('frontend') {
                     bat 'D:\\Node\\npm.cmd ci'
-                }
-            }
-        }
-
-        stage('Backend Tests') {
-            steps {
-                dir('backend') {
-                    bat 'D:\\Node\\npm.cmd test -- --forceExit --detectOpenHandles'
                 }
             }
         }
@@ -71,10 +55,10 @@ pipeline {
             bat 'taskkill /F /IM node.exe 2>NUL || exit /b 0'
         }
         success {
-            echo "CI PASSED for commit ${env.GIT_SHORT_COMMIT}"
+            echo "Frontend CI PASSED for commit ${env.GIT_SHORT_COMMIT}"
         }
         failure {
-            echo "CI FAILED for commit ${env.GIT_SHORT_COMMIT} — check logs above."
+            echo "Frontend CI FAILED for commit ${env.GIT_SHORT_COMMIT} — check logs above."
         }
     }
 }
