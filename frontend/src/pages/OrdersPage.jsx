@@ -10,6 +10,11 @@ import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { STATUS_COLORS, STATUS_LABELS, getCategoryEmoji, formatOrderId, formatINR } from '../utils/constants';
 
+const UNIT_WEIGHT_KG = { kg: 1, piece: 0.3, dozen: 1.2, box: 5, bunch: 0.5 };
+function orderItemWeightKg(item) {
+  return item.quantity * (UNIT_WEIGHT_KG[item.unit] || 1);
+}
+
 const CANCELLABLE = ['payment_pending', 'payment_complete', 'pending', 'confirmed', 'accepted'];
 const PAYMENT_STATUSES = ['payment_pending', 'payment_authorized', 'payment_captured', 'payment_complete', 'payment_failed'];
 
@@ -54,10 +59,13 @@ function OrderCard({ order, userRole, onCancelled }) {
   const itemsByFarmer = {};
   for (const item of order.items) {
     if (!itemsByFarmer[item.farmerId]) {
-      itemsByFarmer[item.farmerId] = { farmerName: item.farmerName, items: [] };
+      itemsByFarmer[item.farmerId] = { farmerName: item.farmerName, items: [], weightKg: 0, transportCost: 0 };
     }
     itemsByFarmer[item.farmerId].items.push(item);
+    itemsByFarmer[item.farmerId].weightKg += orderItemWeightKg(item);
+    itemsByFarmer[item.farmerId].transportCost += (item.transportCostPerUnit || 0) * item.quantity;
   }
+  const totalOrderWeightKg = order.items.reduce((s, i) => s + orderItemWeightKg(i), 0);
   const hasMultipleFarmers = Object.keys(itemsByFarmer).length > 1;
 
   const handleCancel = async () => {
@@ -105,14 +113,17 @@ function OrderCard({ order, userRole, onCancelled }) {
 
       {/* Items grouped by farmer for multi-farmer orders (customer view) */}
       {hasMultipleFarmers && userRole === 'customer' ? (
-        Object.entries(itemsByFarmer).map(([farmerId, { farmerName, items: farmerItems }], groupIdx) => {
+        Object.entries(itemsByFarmer).map(([farmerId, { farmerName, items: farmerItems, weightKg, transportCost }], groupIdx) => {
           const farmerStatus = order.itemStatuses?.find(s => s.farmerId === farmerId);
+          const shippingShare = totalOrderWeightKg > 0
+            ? Math.round((order.shippingFee || 0) * weightKg / totalOrderWeightKg)
+            : 0;
           return (
             <Box key={farmerId}>
               {groupIdx > 0 && <Divider sx={{ my: 1 }} />}
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.25}>
                 <Typography variant="caption" fontWeight="bold" color="text.secondary">
-                  From: {farmerName}
+                  🌾 Shipment {groupIdx + 1} — {farmerName}
                 </Typography>
                 {farmerStatus && (
                   <Chip
@@ -123,6 +134,11 @@ function OrderCard({ order, userRole, onCancelled }) {
                   />
                 )}
               </Box>
+              {farmerStatus?.estimatedDelivery && (
+                <Typography variant="caption" color="success.main" display="block" mb={0.5}>
+                  📅 Est. delivery: {new Date(farmerStatus.estimatedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </Typography>
+              )}
               {farmerItems.map((item, idx) => (
                 <Box key={idx} display="flex" justifyContent="space-between" py={0.5}>
                   <Typography variant="body2">
@@ -131,11 +147,16 @@ function OrderCard({ order, userRole, onCancelled }) {
                   <Typography variant="body2" fontWeight="bold">{formatINR(item.subtotal)}</Typography>
                 </Box>
               ))}
-              {farmerStatus?.estimatedDelivery && (
+              <Box display="flex" gap={2} mt={0.5}>
                 <Typography variant="caption" color="text.secondary">
-                  Est. Delivery: {new Date(farmerStatus.estimatedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  Shipping: <strong>{formatINR(shippingShare)}</strong>
                 </Typography>
-              )}
+                {transportCost > 0 && (
+                  <Typography variant="caption" color="text.secondary">
+                    Transport: <strong>{formatINR(transportCost)}</strong>
+                  </Typography>
+                )}
+              </Box>
             </Box>
           );
         })
@@ -195,8 +216,8 @@ function OrderCard({ order, userRole, onCancelled }) {
         </Box>
       )}
 
-      {/* Estimated delivery */}
-      {order.estimatedDelivery && (
+      {/* Estimated delivery — only for single-farmer orders; multi-farmer shows per-farmer above */}
+      {order.estimatedDelivery && !hasMultipleFarmers && (
         <Box display="flex" justifyContent="space-between" alignItems="center" mt={0.5}>
           <Typography variant="caption" color="text.secondary">📅 Est. Delivery</Typography>
           <Typography variant="caption" fontWeight="bold">
