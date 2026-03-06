@@ -107,9 +107,9 @@ export default function OrderConfirmationPage() {
                   {isMultiFarmer && (
                     <>
                       {groupIdx > 0 && <Divider sx={{ my: 1 }} />}
-                      <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                      <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.25}>
                         <Typography variant="caption" fontWeight="bold" color="text.secondary">
-                          From: {farmerName}
+                          🌾 Shipment {groupIdx + 1} — {farmerName}
                         </Typography>
                         {farmerStatus && (
                           <Chip
@@ -120,6 +120,11 @@ export default function OrderConfirmationPage() {
                           />
                         )}
                       </Box>
+                      {farmerStatus?.estimatedDelivery && (
+                        <Typography variant="caption" color="success.main" display="block" mb={0.5}>
+                          📅 Est. delivery: {new Date(farmerStatus.estimatedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </Typography>
+                      )}
                     </>
                   )}
                   {farmerItems.map((item, idx) => (
@@ -211,8 +216,8 @@ export default function OrderConfirmationPage() {
           </>
         )}
 
-        {/* Estimated delivery */}
-        {order.estimatedDelivery && (
+        {/* Estimated delivery — only show overall date for single-farmer orders; multi-farmer shows per-farmer above */}
+        {order.estimatedDelivery && (order.itemStatuses?.length || 0) <= 1 && (
           <>
             <Divider />
             <Box sx={{ px: 2.5, py: 1.5 }}>

@@ -56,6 +56,7 @@ export default function CartPage() {
     totalWeightKg, shippingFee,
     voucher, applyVoucher, removeVoucher,
     discountAmount, discountedTotal,
+    farmerGroups, isMultiFarmer,
   } = useCart();
 
   const [loading, setLoading] = useState(false);
@@ -282,32 +283,90 @@ export default function CartPage() {
     <Container maxWidth="sm" sx={{ py: 3, px: { xs: 1.5, sm: 2 } }}>
       <Typography variant="h5" fontWeight="bold" gutterBottom>{t('cart.title')}</Typography>
 
-      <Paper elevation={2} sx={{ mb: 2, borderRadius: 2, overflow: 'hidden' }}>
-        {items.map((item, idx) => (
-          <Box key={item.id}>
-            <Box sx={{ p: { xs: 1.5, sm: 2 }, display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
-              <Typography fontSize={{ xs: '2rem', sm: '2.5rem' }} lineHeight={1} flexShrink={0}>{getCategoryEmoji(item.category)}</Typography>
-              <Box flexGrow={1} minWidth={0}>
-                <Typography variant="subtitle2" fontWeight="bold" noWrap>{item.name}</Typography>
-                <Typography variant="caption" color="text.secondary" display="block">
-                  {formatINR(item.price)}/{item.unit}
-                  {item.transportCostPerUnit > 0 && ` · ${t('cart.transport_label', { amount: formatINR(item.transportCostPerUnit) })}`}
-                </Typography>
-                <Typography variant="body2" fontWeight="bold" color="primary.main">
-                  {formatINR(item.price * item.qty)}
-                </Typography>
-              </Box>
-              <Box display="flex" alignItems="center" gap={0.5} flexShrink={0}>
-                <IconButton size="small" onClick={() => updateQty(item.id, item.qty - 1)} sx={{ width: 32, height: 32 }}><Remove fontSize="small" /></IconButton>
-                <Typography sx={{ minWidth: 24, textAlign: 'center', fontWeight: 'bold' }}>{item.qty}</Typography>
-                <IconButton size="small" onClick={() => updateQty(item.id, item.qty + 1)} sx={{ width: 32, height: 32 }}><Add fontSize="small" /></IconButton>
-                <IconButton size="small" color="error" onClick={() => removeItem(item.id)} sx={{ width: 32, height: 32 }}><Delete fontSize="small" /></IconButton>
-              </Box>
-            </Box>
-            {idx < items.length - 1 && <Divider />}
+      {isMultiFarmer && (
+        <Box sx={{ mb: 1.5, p: 1.5, bgcolor: 'info.50', borderRadius: 2, border: '1px solid', borderColor: 'info.200' }}>
+          <Typography variant="body2" color="info.main" fontWeight="bold">
+            📦 Items from {farmerGroups.length} farmers — each will be shipped separately
+          </Typography>
+        </Box>
+      )}
+
+      {isMultiFarmer ? farmerGroups.map((group, gIdx) => (
+        <Paper key={group.farmerId} elevation={2} sx={{ mb: 2, borderRadius: 2, overflow: 'hidden' }}>
+          <Box sx={{ px: 2, py: 1, bgcolor: 'grey.100', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="caption" fontWeight="bold" color="text.secondary">
+              🌾 Shipment {gIdx + 1} — {group.farmerName}
+            </Typography>
+            <Typography variant="caption" color="success.main" fontWeight="bold">
+              Est. delivery: 3–5 business days
+            </Typography>
           </Box>
-        ))}
-      </Paper>
+          {group.items.map((item, idx) => (
+            <Box key={item.id}>
+              <Box sx={{ p: { xs: 1.5, sm: 2 }, display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
+                <Typography fontSize={{ xs: '2rem', sm: '2.5rem' }} lineHeight={1} flexShrink={0}>{getCategoryEmoji(item.category)}</Typography>
+                <Box flexGrow={1} minWidth={0}>
+                  <Typography variant="subtitle2" fontWeight="bold" noWrap>{item.name}</Typography>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    {formatINR(item.price)}/{item.unit}
+                  </Typography>
+                  <Typography variant="body2" fontWeight="bold" color="primary.main">
+                    {formatINR(item.price * item.qty)}
+                  </Typography>
+                </Box>
+                <Box display="flex" alignItems="center" gap={0.5} flexShrink={0}>
+                  <IconButton size="small" onClick={() => updateQty(item.id, item.qty - 1)} sx={{ width: 32, height: 32 }}><Remove fontSize="small" /></IconButton>
+                  <Typography sx={{ minWidth: 24, textAlign: 'center', fontWeight: 'bold' }}>{item.qty}</Typography>
+                  <IconButton size="small" onClick={() => updateQty(item.id, item.qty + 1)} sx={{ width: 32, height: 32 }}><Add fontSize="small" /></IconButton>
+                  <IconButton size="small" color="error" onClick={() => removeItem(item.id)} sx={{ width: 32, height: 32 }}><Delete fontSize="small" /></IconButton>
+                </Box>
+              </Box>
+              {idx < group.items.length - 1 && <Divider />}
+            </Box>
+          ))}
+          <Divider />
+          <Box sx={{ px: 2, py: 1, bgcolor: 'grey.50', display: 'flex', gap: 2 }}>
+            <Typography variant="caption" color="text.secondary">
+              Subtotal: <strong>{formatINR(group.subtotal)}</strong>
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Shipping share: <strong>{formatINR(group.shippingShare)}</strong>
+            </Typography>
+            {group.transportCost > 0 && (
+              <Typography variant="caption" color="text.secondary">
+                Transport: <strong>{formatINR(group.transportCost)}</strong>
+              </Typography>
+            )}
+          </Box>
+        </Paper>
+      )) : (
+        <Paper elevation={2} sx={{ mb: 2, borderRadius: 2, overflow: 'hidden' }}>
+          {items.map((item, idx) => (
+            <Box key={item.id}>
+              <Box sx={{ p: { xs: 1.5, sm: 2 }, display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
+                <Typography fontSize={{ xs: '2rem', sm: '2.5rem' }} lineHeight={1} flexShrink={0}>{getCategoryEmoji(item.category)}</Typography>
+                <Box flexGrow={1} minWidth={0}>
+                  <Typography variant="subtitle2" fontWeight="bold" noWrap>{item.name}</Typography>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    {formatINR(item.price)}/{item.unit}
+                    {item.transportCostPerUnit > 0 && ` · ${t('cart.transport_label', { amount: formatINR(item.transportCostPerUnit) })}`}
+                  </Typography>
+                  <Typography variant="body2" fontWeight="bold" color="primary.main">
+                    {formatINR(item.price * item.qty)}
+                  </Typography>
+                </Box>
+                <Box display="flex" alignItems="center" gap={0.5} flexShrink={0}>
+                  <IconButton size="small" onClick={() => updateQty(item.id, item.qty - 1)} sx={{ width: 32, height: 32 }}><Remove fontSize="small" /></IconButton>
+                  <Typography sx={{ minWidth: 24, textAlign: 'center', fontWeight: 'bold' }}>{item.qty}</Typography>
+                  <IconButton size="small" onClick={() => updateQty(item.id, item.qty + 1)} sx={{ width: 32, height: 32 }}><Add fontSize="small" /></IconButton>
+                  <IconButton size="small" color="error" onClick={() => removeItem(item.id)} sx={{ width: 32, height: 32 }}><Delete fontSize="small" /></IconButton>
+                </Box>
+              </Box>
+              {idx < items.length - 1 && <Divider />}
+            </Box>
+          ))}
+        </Paper>
+      )}
 
       <Paper elevation={2} sx={{ p: 2, mb: 2, borderRadius: 2 }}>
         <Box display="flex" alignItems="center" gap={1} mb={1}>
@@ -392,6 +451,19 @@ export default function CartPage() {
           </Box>
           <Typography fontWeight="bold">{formatINR(shippingFee)}</Typography>
         </Box>
+        {isMultiFarmer && (
+          <Box sx={{ bgcolor: 'info.50', borderRadius: 1, px: 1.5, py: 1, mb: 1 }}>
+            <Typography variant="caption" color="info.main" fontWeight="bold" display="block" mb={0.5}>
+              Shipping split across {farmerGroups.length} separate shipments
+            </Typography>
+            {farmerGroups.map((g, i) => (
+              <Box key={g.farmerId} display="flex" justifyContent="space-between">
+                <Typography variant="caption" color="text.secondary">Shipment {i + 1} — {g.farmerName}</Typography>
+                <Typography variant="caption" color="text.secondary">{formatINR(g.shippingShare)}</Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
 
         {/* Shipping tier reference */}
         <Box sx={{ bgcolor: 'grey.50', borderRadius: 1, px: 1.5, py: 1, mb: 1, mt: 0.5 }}>

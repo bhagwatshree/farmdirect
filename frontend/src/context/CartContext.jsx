@@ -62,10 +62,29 @@ export function CartProvider({ children }) {
   const count = items.reduce((sum, i) => sum + i.qty, 0);
   const totalWeightKg = getCartWeightKg(items);
   const shippingFee = items.length > 0 ? getShippingFee(totalWeightKg) : 0;
-  // Keep transportTotal for per-item farmer costs (backwards compat)
   const transportTotal = items.reduce((sum, i) => sum + (i.transportCostPerUnit || 0) * i.qty, 0);
   const discountAmount = voucher ? voucher.discountAmount : 0;
   const discountedTotal = Math.max(0, total + shippingFee + transportTotal - discountAmount);
+
+  // Group items by farmer with per-farmer cost breakdown
+  const farmerGroups = (() => {
+    const groups = {};
+    for (const item of items) {
+      const fid = item.farmerId || 'unknown';
+      if (!groups[fid]) {
+        groups[fid] = { farmerId: fid, farmerName: item.farmerName || 'Farmer', items: [] };
+      }
+      groups[fid].items.push(item);
+    }
+    return Object.values(groups).map(g => {
+      const wKg = getCartWeightKg(g.items);
+      const gTransportCost = g.items.reduce((s, i) => s + (i.transportCostPerUnit || 0) * i.qty, 0);
+      const gSubtotal = g.items.reduce((s, i) => s + i.price * i.qty, 0);
+      const gShippingShare = totalWeightKg > 0 ? Math.round(shippingFee * wKg / totalWeightKg) : 0;
+      return { ...g, weightKg: wKg, subtotal: gSubtotal, transportCost: gTransportCost, shippingShare: gShippingShare };
+    });
+  })();
+  const isMultiFarmer = farmerGroups.length > 1;
 
   return (
     <CartContext.Provider value={{
@@ -74,6 +93,7 @@ export function CartProvider({ children }) {
       totalWeightKg, shippingFee,
       voucher, applyVoucher, removeVoucher,
       discountAmount, discountedTotal,
+      farmerGroups, isMultiFarmer,
       drawerOpen,
       openDrawer: () => setDrawerOpen(true),
       closeDrawer: () => setDrawerOpen(false),
