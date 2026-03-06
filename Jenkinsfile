@@ -6,6 +6,7 @@ pipeline {
 
     environment {
         PATH = "D:\\Node;${env.PATH}"
+        MONGOMS_DOWNLOAD_DIR = "D:\\Claude\\Test_Project\\jenkins\\home\\.cache\\mongodb-binaries"
     }
 
     triggers {
