@@ -36,6 +36,7 @@ pipeline {
         stage('Install Frontend Deps') {
             steps {
                 dir('frontend') {
+                    bat 'if exist node_modules rmdir /S /Q node_modules'
                     bat 'D:\\Node\\npm.cmd ci'
                 }
             }
